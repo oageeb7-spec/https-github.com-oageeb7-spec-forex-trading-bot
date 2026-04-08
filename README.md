@@ -1,0 +1,1 @@
+# https-github.com-oageeb7-spec-forex-trading-bot
