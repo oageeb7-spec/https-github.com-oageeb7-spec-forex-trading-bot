@@ -1,4 +1,4 @@
-# JARVIS // Trade-Brain
+# OS Trading AI
 
 An agentic forex research and trading system with a live dashboard. A team of agents finds
 strategy ideas, turns them into testable recipes, backtests variants, filters them through a

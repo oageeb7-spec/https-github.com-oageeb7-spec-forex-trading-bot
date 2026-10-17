@@ -1,5 +1,5 @@
 {
-  "name": "jarvis-trade-brain",
+  "name": "os-trading-ai",
   "version": "0.1.0",
   "description": "Agentic forex research and trading system: agents find sources, write strategy recipes, backtest variants, run a robustness sieve and paper-trade what you approve.",
   "type": "module",

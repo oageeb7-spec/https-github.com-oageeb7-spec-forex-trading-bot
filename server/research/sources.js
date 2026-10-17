@@ -14,7 +14,7 @@ const BASE = {
 async function get(url, headers = {}, as = 'json') {
   let res;
   try {
-    res = await fetch(url, { headers: { 'User-Agent': 'jarvis-trade-brain/0.1', ...headers }, signal: AbortSignal.timeout(20000) });
+    res = await fetch(url, { headers: { 'User-Agent': 'os-trading-ai/0.1', ...headers }, signal: AbortSignal.timeout(20000) });
   } catch (e) {
     throw new Error(`cannot reach ${new URL(url).host}: ${e.cause?.code || e.message}`);
   }

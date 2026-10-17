@@ -151,4 +151,4 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => console.log(`JARVIS // TRADE-BRAIN running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`OS AI // TRADING running on http://localhost:${PORT}`));
