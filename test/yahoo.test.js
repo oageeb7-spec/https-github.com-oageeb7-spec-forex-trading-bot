@@ -7,7 +7,7 @@ import { Feed } from '../server/engine/market.js';
 const H = 3600_000;
 const end = Math.floor(Date.now() / H) * H; // start of the current (forming) hour
 const make = (seed, n) => new Feed('EURUSD', seed).generate(n).map((b, i) => ({ ...b, t: end - (n - 1 - i) * H }));
-const series = { 'EURUSD=X': make(1, 9000), 'JPY=X': make(2, 9000), 'GC=F': make(3, 9000) };
+const series = { 'EURUSD=X': make(1, 9000), 'JPY=X': make(2, 9000), 'GC=F': make(3, 9000), 'BTC-USD': make(4, 9000) };
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const ticker = decodeURIComponent(u.pathname.split('/').pop());
@@ -37,7 +37,7 @@ test('fetchBars drops gaps and the forming candle', async () => {
 test('loads available instruments, skips missing ones, keeps the last N bars', async () => {
   const warnings = [];
   const { feeds } = await loadYahooFeeds({ bars: 8000, log: (m) => warnings.push(m) });
-  assert.deepEqual(Object.keys(feeds), ['EURUSD', 'USDJPY', 'XAUUSD']);
+  assert.deepEqual(Object.keys(feeds), ['EURUSD', 'USDJPY', 'XAUUSD', 'BTCUSD']);
   assert.equal(feeds.EURUSD.bars.length, 8000);
   assert.equal(warnings.length, 3);
 });

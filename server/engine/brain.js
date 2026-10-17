@@ -26,6 +26,7 @@ const TOPICS = [
   { topic: 'Fair value gaps (ICT)', template: 'fvg', q: 'fair value gap backtest' },
   { topic: 'Order blocks and imbalance', template: 'fvg', q: 'order block imbalance strategy' },
   { topic: 'Moving average crossover systems', template: 'trend', q: 'ema crossover forex' },
+  { topic: 'Bitcoin momentum and breakouts', template: 'momentum', q: 'bitcoin trading strategy backtest' },
 ];
 const HYPE = ['This strategy wins every time', '100% win rate scalping secret', 'Turn $100 into $10,000 in a week', 'The only indicator you will ever need'];
 const TERMS = ['Judas swing', 'Optimal trade entry', 'Silver bullet', 'Kill zone', 'Balanced price range', 'Breaker block', 'Mitigation block', 'Premium / discount', 'Power of three', 'Inducement'];

@@ -32,6 +32,8 @@ export const INSTRUMENTS = {
   USDJPY: { name: 'USD/JPY', start: 151.2, vol: 0.0012, contract: 100000, spread: 0.012, digits: 3, toUsd: (p) => 1 / p },
   USDCAD: { name: 'USD/CAD', start: 1.36, vol: 0.001, contract: 100000, spread: 0.00012, digits: 5, toUsd: (p) => 1 / p },
   XAUUSD: { name: 'Gold', start: 2350, vol: 0.0022, contract: 100, spread: 0.3, digits: 2, toUsd: () => 1 },
+  // 1 lot = 1 BTC. Trades around the clock, so weekends count.
+  BTCUSD: { name: 'Bitcoin', start: 65000, vol: 0.0065, contract: 1, spread: 15, digits: 2, toUsd: () => 1, weekends: true },
 };
 
 const HOUR = 3600_000;
@@ -68,7 +70,7 @@ export class Feed {
     const l = Math.min(o, c) * (1 - Math.abs(gauss(r)) * sigma * 0.45);
     const bar = { t: this.t, o, h, l, c };
     this.price = c;
-    do this.t += HOUR; while ([0, 6].includes(new Date(this.t).getUTCDay()));
+    do this.t += HOUR; while (!inst.weekends && [0, 6].includes(new Date(this.t).getUTCDay()));
     return bar;
   }
 

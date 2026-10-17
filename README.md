@@ -22,7 +22,7 @@ npm run demo    # fully simulated: generated prices and research, no keys needed
 npm test
 ```
 
-By default everything is real: prices come from **OS AI data** (real hourly FX and gold prices
+By default everything is real: prices come from **OS AI data** (real hourly FX, gold and bitcoin prices
 from Yahoo Finance's public feed, no key needed) and the agents research real sources. With an
 `OANDA_API_KEY` the feed switches to OANDA, which adds real bid/ask spreads. If no feed can
 load, the server stops rather than inventing prices.
@@ -87,8 +87,9 @@ With `DASHBOARD_PASSWORD` set, every page and API call needs that password (any 
 
 ## OS AI data
 
-Hourly candles for EUR/USD, GBP/USD, AUD/USD, USD/JPY, USD/CAD and gold (COMEX front-month
-future) from Yahoo Finance's public chart endpoint: about two years of history (the last 8,000
+Hourly candles for EUR/USD, GBP/USD, AUD/USD, USD/JPY, USD/CAD, gold (COMEX front-month
+future) and bitcoin (BTC/USD, 1 lot = 1 BTC, traded 24/7 so weekends count in its backtests)
+from Yahoo Finance's public chart endpoint: about two years of history (the last 8,000
 bars are used) and new candles polled every `POLL_MS`. The feed has no bid/ask, so backtests
 charge typical retail spreads. It is unofficial and free, so Yahoo can change or rate-limit it;
 for a contractual feed use OANDA below.

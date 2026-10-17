@@ -7,7 +7,8 @@ const BASE = () => process.env.YAHOO_URL || 'https://query1.finance.yahoo.com';
 const HOUR = 3600_000;
 
 // Gold uses the COMEX front-month future (GC=F); Yahoo has no hourly spot gold series.
-export const YAHOO_TICKERS = { EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', AUDUSD: 'AUDUSD=X', USDJPY: 'JPY=X', USDCAD: 'CAD=X', XAUUSD: 'GC=F' };
+// Bitcoin (BTC-USD) trades around the clock, so its history includes weekends.
+export const YAHOO_TICKERS = { EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', AUDUSD: 'AUDUSD=X', USDJPY: 'JPY=X', USDCAD: 'CAD=X', XAUUSD: 'GC=F', BTCUSD: 'BTC-USD' };
 
 export async function fetchBars(symbol, range) {
   const url = `${BASE()}/v8/finance/chart/${encodeURIComponent(YAHOO_TICKERS[symbol])}?interval=1h&range=${range}`;

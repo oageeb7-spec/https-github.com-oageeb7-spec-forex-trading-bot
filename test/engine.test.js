@@ -103,3 +103,16 @@ test('state saved by one brain restores into a fresh one', () => {
   assert.equal(new Set(b.decisions.map((x) => x.id)).size, b.decisions.length);
   assert.equal(b.restore({ version: 99 }), false);
 });
+
+test('bitcoin trades through weekends; forex does not', () => {
+  const btc = new Feed('BTCUSD').generate(24 * 14);
+  assert.ok(btc.some((b) => [0, 6].includes(new Date(b.t).getUTCDay())));
+  // A Saturday win counts toward bitcoin's daily Sharpe but is ignored on FX's weekday calendar.
+  const t0 = Date.UTC(2024, 0, 1); // a Monday
+  const trades = [2, 5, 9].map((d) => ({ pnl: 100, r: 1, exitT: t0 + d * 86400_000 + 3600_000 })); // Wed, Sat, Wed
+  const fx = metrics(trades, t0, t0 + 13 * 86400_000);
+  const crypto = metrics(trades, t0, t0 + 13 * 86400_000, { weekends: true });
+  assert.notEqual(fx.sharpe, crypto.sharpe);
+  const sig = TEMPLATES.trend.signals(btc, { fast: 10, slow: 40, stopAtr: 2, rr: 2 });
+  assert.ok(Array.isArray(sig));
+});

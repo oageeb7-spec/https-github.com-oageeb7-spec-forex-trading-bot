@@ -34,10 +34,10 @@ export function backtest(bars, template, params, symbol, { costMult = 1, from = 
     });
     busyUntil = j;
   }
-  return { trades, metrics: metrics(trades, bars[from].t, bars[to - 1].t) };
+  return { trades, metrics: metrics(trades, bars[from].t, bars[to - 1].t, { weekends: inst.weekends }) };
 }
 
-export function metrics(trades, startT, endT) {
+export function metrics(trades, startT, endT, { weekends = false } = {}) {
   const n = trades.length;
   const wins = trades.filter((t) => t.pnl > 0), losses = trades.filter((t) => t.pnl <= 0);
   const avgWin = wins.length ? mean(wins.map((t) => t.pnl)) : 0;
@@ -56,9 +56,10 @@ export function metrics(trades, startT, endT) {
   const days = Math.max(1, Math.round((endT - startT) / DAY));
   const daily = new Array(days + 1).fill(0);
   for (const t of trades) daily[Math.min(days, Math.floor((t.exitT - startT) / DAY))] += t.pnl;
-  const tradingDays = daily.filter((_, i) => ![0, 6].includes(new Date(startT + i * DAY).getUTCDay()));
+  // FX and gold rest at weekends; 24/7 markets such as bitcoin keep every day and annualize over 365.
+  const tradingDays = weekends ? daily : daily.filter((_, i) => ![0, 6].includes(new Date(startT + i * DAY).getUTCDay()));
   const sd = std(tradingDays);
-  const sharpe = sd ? (mean(tradingDays) / sd) * Math.sqrt(252) : 0;
+  const sharpe = sd ? (mean(tradingDays) / sd) * Math.sqrt(weekends ? 365 : 252) : 0;
 
   const months = {};
   for (const t of trades) {
