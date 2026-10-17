@@ -1,6 +1,7 @@
 // Voice control: speak to OS AI and hear it answer. Uses the browser's built-in speech recognition
-// and speech synthesis (Chrome, Edge, Safari). Anything that risks money needs a spoken "yes" and
-// arming real trading or approving a live strategy is refused by voice: do those on screen.
+// and speech synthesis (Chrome, Edge, Safari). Commands run here; any other question goes to the
+// server's assistant (/api/ask). Anything that risks money needs a spoken "yes", and arming real
+// trading or approving a live strategy is refused by voice: do those on screen.
 import { $, post } from './ui.js';
 
 const PAGES = {
@@ -17,6 +18,27 @@ let rec = null, listening = false, speaking = false, state = null, pending = nul
 // Commands are English, so recognise English even when the browser is set to another language.
 const LANG = /^en\b/i.test(navigator.language || '') ? navigator.language : 'en-GB';
 
+// Prefer the most natural English voice the device has (neural voices in Edge and Chrome, Siri voices
+// on Apple). "Change voice" steps through the rest; the choice is remembered on this device.
+const GOOD = [/natural/i, /neural/i, /online/i, /google uk english female/i, /google us english/i, /siri/i, /samantha|daniel|serena|karen|moira/i, /google/i];
+let voices = [], voiceIdx = -1;
+function loadVoices() {
+  if (!window.speechSynthesis?.getVoices) return;
+  voices = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+  const rank = (v) => { const i = GOOD.findIndex((r) => r.test(v.name)); return i < 0 ? GOOD.length : i; };
+  voices.sort((a, b) => rank(a) - rank(b) || (b.lang === LANG) - (a.lang === LANG));
+  let saved = null;
+  try { saved = localStorage.getItem('osai-voice'); } catch { /* storage blocked */ }
+  const i = voices.findIndex((v) => v.name === saved);
+  voiceIdx = i >= 0 ? i : voices.length ? 0 : -1;
+}
+function nextVoice() {
+  if (!voices.length) return null;
+  voiceIdx = (voiceIdx + 1) % voices.length;
+  try { localStorage.setItem('osai-voice', voices[voiceIdx].name); } catch { /* storage blocked */ }
+  return voices[voiceIdx].name;
+}
+
 // Speak a reply. The microphone is paused while OS AI talks so it never hears itself and
 // mistakes its own answer for a new command.
 function say(text) {
@@ -25,10 +47,11 @@ function say(text) {
   speechSynthesis.cancel();
   speaking = true;
   pauseMic();
-  const parts = text.match(/[^.?!]+[.?!]*/g) || [text]; // Chrome cuts long utterances, so speak sentence by sentence
+  const parts = text.split(/(?<=[.?!])\s+/).filter(Boolean); // split at sentence ends, not decimal points // Chrome cuts long utterances, so speak sentence by sentence
   parts.forEach((part, i) => {
     const u = new SpeechSynthesisUtterance(part.trim());
     u.lang = LANG;
+    if (voices[voiceIdx]) { u.voice = voices[voiceIdx]; u.lang = voices[voiceIdx].lang; }
     u.rate = 1.03;
     if (i === parts.length - 1) u.onend = u.onerror = () => { speaking = false; resumeMic(); };
     setTimeout(() => speechSynthesis.speak(u), 0); // speaking straight after cancel() is dropped in Chrome
@@ -53,7 +76,8 @@ function status(s) {
 }
 
 const HELP = 'You can say: status. Go to lab, research, strategies, knowledge, agent room, paper, decisions, costs or machines. '
-  + 'Read decisions. Approve, or reject. Kill switch. Announcements on, or off. Stop listening.';
+  + 'Read decisions. Approve, or reject. Kill switch. Announcements on, or off. Change voice. Stop listening. '
+  + 'Or just ask a question, like: what is gold at, which strategy is best, or how are the paper trades doing.';
 
 export async function handle(raw) {
   const t = raw.toLowerCase().replace(/[.!?,]/g, '').trim();
@@ -69,8 +93,9 @@ export async function handle(raw) {
   }
   if (/\b(help|what can i say|commands)\b/.test(t)) return say(HELP);
   if (/\b(stop listening|go to sleep|mute)\b/.test(t)) { stop(); return say('Voice off.'); }
+  if (/\b(change|next|another|different) voice\b/.test(t)) { const v = nextVoice(); return say(v ? `This is ${v.replace(/\s*\(.*\)/, '')}.` : 'This device has no other English voices.'); }
   if (/\bannouncements? (on|off)\b/.test(t)) { announce = /on$/.test(t); return say(`Announcements ${announce ? 'on' : 'off'}.`); }
-  if (/\b(status|report|how are we doing|summary)\b/.test(t)) return say(status(state));
+  if (/^(status|report|summary|how are we doing|give me (a |the )?(status|summary|report))$/.test(t)) return say(status(state));
 
   const nav = t.match(/\b(?:go to|open|show(?: me)?|switch to)\s+(?:the\s+)?(.+)$/);
   if (nav) {
@@ -90,18 +115,37 @@ export async function handle(raw) {
     const d = waiting.at(-1);
     if (!d) return say('Nothing is waiting for you.');
     if (d.kind === 'live' && verb === 'approve') return say(`${d.title} would trade real money. Approve it on screen, under Decisions.`);
-    pending = { run: async () => { await post(`/api/decisions/${d.id}`, { action: verb }); window.dispatchEvent(new Event('brain:refresh')); say(`${verb === 'approve' ? 'Approved' : 'Rejected'}: ${d.title}.`); } };
+    pending = { run: async () => {
+      if (!(await post(`/api/decisions/${d.id}`, { action: verb }))) return say('That did not go through. It may already be decided; check the Decisions page.');
+      window.dispatchEvent(new Event('brain:refresh'));
+      say(`${verb === 'approve' ? 'Approved' : 'Rejected'}: ${d.title}.`);
+    } };
     return say(`${verb === 'approve' ? 'Approve' : 'Reject'} ${d.title}? Say yes to confirm.`);
   }
 
   if (/\b(kill switch|stop (all )?trading|close everything)\b/.test(t)) {
     if (!state.bridge?.configured) return say('MetaTrader is not connected, so there is nothing to stop.');
-    pending = { run: async () => { await post('/api/bridge/kill', {}); window.dispatchEvent(new Event('brain:refresh')); say('Kill switch on. Trading stopped and all OS AI positions are being closed.'); } };
+    pending = { run: async () => {
+      if (!(await post('/api/bridge/kill', {}))) return say('The kill switch did not go through. Press it on the Paper and live page now.');
+      window.dispatchEvent(new Event('brain:refresh'));
+      say('Kill switch on. Trading stopped and all OS AI positions are being closed.');
+    } };
     return say('Stop all live trading and close every OS AI position? Say yes to confirm.');
   }
   if (/\barm\b/.test(t)) return say('For safety, arm live trading on screen, on the Paper and live page.');
 
-  return say(`Sorry, I didn't catch a command in "${raw}". Say help to hear what I can do.`);
+  return ask(raw);
+}
+
+async function ask(question) {
+  show('Thinking…');
+  try {
+    const r = await fetch('/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: question }) });
+    const { answer, error } = await r.json();
+    return say(answer || error || 'I have no answer for that.');
+  } catch {
+    return say('I could not reach OS AI. Check your connection and try again.');
+  }
 }
 
 const ERRORS = {
@@ -117,12 +161,13 @@ function start() {
   rec = new Recognition();
   rec.lang = LANG;
   rec.continuous = false; // one phrase per session, restarted after each: steadier on Safari and Android
-  rec.interimResults = false;
+  rec.interimResults = true; // show words as they are heard; act only on the final result
   rec.maxAlternatives = 1;
   rec.onresult = (e) => {
     if (speaking) return;
     const r = e.results[e.results.length - 1];
-    if (r.isFinal) handle(r[0].transcript).catch((err) => say(`Something went wrong: ${err.message}`));
+    if (!r.isFinal) return show('', `${r[0].transcript}…`);
+    handle(r[0].transcript).catch((err) => say(`Something went wrong: ${err.message}`));
   };
   rec.onerror = (e) => {
     if (e.error === 'no-speech' || e.error === 'aborted') return; // silence: just listen again
@@ -168,6 +213,14 @@ export function voiceState(s) {
 export function initVoice() {
   const btn = $('#voice-btn'), input = $('#voice-input');
   if (!btn) return;
+  loadVoices();
+  if (window.speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
+  // Keyboard: V turns the microphone on or off, / jumps to the typed command box.
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if (e.key === '/') { e.preventDefault(); input.hidden = false; input.focus(); }
+    else if (e.key.toLowerCase() === 'v' && !btn.disabled) btn.click();
+  });
   input.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     const cmd = input.value;

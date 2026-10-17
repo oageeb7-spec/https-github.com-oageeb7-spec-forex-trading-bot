@@ -149,9 +149,18 @@ Costs · Machines.
 
 ## Voice
 
-Click the microphone in the top bar (Chrome, Edge or Safari) and speak: "status", "go to the
-lab", "read decisions", "approve" (then "yes"), "kill switch", "announcements on", "help". Voice
-never arms real trading or approves a live strategy; do those on screen.
+Click the microphone in the top bar (Chrome, Edge or Safari), or press **V**, and speak. Press
+**/** to type instead.
+
+- **Commands:** "status", "go to the lab", "read decisions", "approve" (then "yes"), "kill switch",
+  "announcements on", "change voice", "help".
+- **Questions:** "what is gold at?", "which strategy is best?", "how are the paper trades doing?",
+  "what is the account balance?" are answered from the live state. Any other question ("why do
+  breakouts fail in ranges?") is answered by Claude when `ANTHROPIC_API_KEY` is set, and its cost
+  comes out of the thinking budget.
+- It uses the most natural English voice your device has; "change voice" switches.
+
+Voice never arms real trading or approves a live strategy; do those on screen.
 
 ## Live trading on MT4 / MT5
 

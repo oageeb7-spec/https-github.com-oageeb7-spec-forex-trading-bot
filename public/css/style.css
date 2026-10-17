@@ -126,7 +126,7 @@ main { flex: 1; overflow-y: auto; padding: 14px; }
 .k-SEARCH { color: var(--blue); } .k-READ, .k-WATCH { color: #fde68a; } .k-SUMMARIZE { color: #93c5fd; } .k-REJECTED { color: var(--red); }
 .k-TERM { color: var(--pink); } .k-RECIPE { color: var(--amber); } .k-LAB { color: var(--cyan); } .k-SIEVE { color: var(--green); }
 .k-ERROR { color: var(--red); }
-.k-PROPOSAL, .k-SKILL, .k-CHECK { color: var(--violet); } .k-PAPER, .k-LIVE { color: var(--green); } .k-REPORT, .k-BUDGET { color: #e5e9ee; }
+.k-PROPOSAL, .k-SKILL, .k-CHECK { color: var(--violet); } .k-PAPER, .k-LIVE { color: var(--green); } .k-VOICE { color: var(--cyan, #67e8f9); } .k-REPORT, .k-BUDGET { color: #e5e9ee; }
 
 /* decisions */
 .decision { border: 1px solid var(--line-2); border-left: 2px solid var(--amber); padding: 12px; margin-bottom: 10px; background: var(--panel-2); }

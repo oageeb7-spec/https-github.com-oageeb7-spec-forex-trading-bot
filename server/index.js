@@ -10,6 +10,7 @@ import { loadOandaFeeds } from './engine/oanda.js';
 import { loadYahooFeeds } from './engine/yahoo.js';
 import { createResearch } from './research/index.js';
 import { Bridge } from './engine/bridge.js';
+import { Assistant } from './engine/assistant.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const THREE_DIR = path.join(ROOT, '..', 'node_modules', 'three');
@@ -83,15 +84,22 @@ const bridge = new Bridge({
   passwordSet: Boolean(process.env.DASHBOARD_PASSWORD),
 });
 const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research, bridge });
+const assistant = new Assistant();
+console.log(`Voice assistant: ${assistant.enabled ? 'Claude answers open questions' : 'built-in answers (no Anthropic key)'}`);
 
 // State survives restarts (hosts restart idle apps). Kept outside the app folder so redeploys keep
 // it too. The fully simulated demo does not persist unless STATE_FILE is set.
 const STATE_FILE = process.env.STATE_FILE || (SIMULATED ? '' : path.join(os.homedir(), '.os-ai', 'state.json'));
 let restored = false;
 
-// Some hosts run several copies of the app. Only the copy holding this lock saves state and talks to
-// MetaTrader; the others stay on standby (no bridge) so real orders can never be duplicated.
+// Some hosts run several copies of the app. Only the copy holding this lock runs the agents, saves
+// state and talks to MetaTrader. The others stay on standby and forward every API call to it over a
+// local socket, so all visitors see one brain and real orders can never be duplicated.
 const LOCK_FILE = STATE_FILE ? `${STATE_FILE}.lock` : '';
+// Socket paths are limited to about 100 characters; a long state path gets a short one in the temp folder.
+const SOCKET = !STATE_FILE || process.platform === 'win32' ? ''
+  : `${STATE_FILE}.sock`.length <= 100 ? `${STATE_FILE}.sock`
+    : path.join(os.tmpdir(), `osai-${crypto.createHash('sha1').update(STATE_FILE).digest('hex').slice(0, 12)}.sock`);
 let primary = !LOCK_FILE;
 function tryLock() {
   if (primary) return true;
@@ -117,8 +125,9 @@ if (!primary) {
     clearInterval(retry);
     bridge.token = BRIDGE_TOKEN;
     try { brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))); } catch { /* nothing saved yet */ }
+    becomePrimary();
     console.log('This copy took over as primary');
-  }, 30000);
+  }, 10000);
   retry.unref();
 }
 if (STATE_FILE && fs.existsSync(STATE_FILE)) {
@@ -161,6 +170,7 @@ function publish() {
   for (const res of clients) res.write(`data: ${latest}\n\n`);
 }
 setInterval(() => {
+  if (!primary) return; // standby copies forward to the primary instead of running a second brain
   brain.tick();
   publish();
 }, TICK_MS);
@@ -214,13 +224,25 @@ function authorized(req) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-const server = http.createServer(async (req, res) => {
+// Standby copy: hand an API call to the primary over its local socket, streams included.
+function forward(req, res) {
+  const up = http.request({ socketPath: SOCKET, path: req.url, method: req.method, headers: req.headers }, (r) => {
+    res.writeHead(r.statusCode, r.headers);
+    r.pipe(res);
+  });
+  up.on('error', () => { if (!res.headersSent) json(res, 503, { error: 'OS AI is starting up; try again in a few seconds.' }); else res.end(); });
+  res.on('close', () => up.destroy()); // the visitor left (e.g. closed a live stream)
+  req.pipe(up);
+}
+
+async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   let m;
 
   res.setHeader('Content-Security-Policy', `frame-ancestors ${FRAME_ANCESTORS}`);
-  if (p === '/healthz') return json(res, 200, { ok: true });
+  if (p === '/healthz') return json(res, 200, { ok: true, primary });
+  if (!primary && SOCKET && p.startsWith('/api/')) return forward(req, res);
 
   // The MetaTrader EA authenticates with its own token instead of the dashboard password.
   if (p === '/api/bridge/orders' || p === '/api/bridge/report') {
@@ -281,6 +303,18 @@ const server = http.createServer(async (req, res) => {
     publish(), saveState();
     return json(res, 200, { ok: true });
   }
+  if (req.method === 'POST' && p === '/api/ask') {
+    const { q } = await readBody(req);
+    try {
+      const r = await assistant.ask(q, brain.snapshot());
+      if (r.cost) brain.spendUsd('director', r.cost);
+      if (r.by === 'claude') brain.emit('VOICE', `Asked: "${String(q).slice(0, 80)}"`, 'director');
+      return json(res, 200, { answer: r.answer, by: r.by });
+    } catch (e) {
+      console.error(`[voice] ${e.message}`);
+      return json(res, 200, { answer: 'I could not reach Claude just now. Try again in a moment.', by: 'error' });
+    }
+  }
   if (req.method === 'POST' && p === '/api/budget') {
     const { limit } = await readBody(req);
     if (!(limit > 0)) return json(res, 400, { error: 'limit must be > 0' });
@@ -298,13 +332,22 @@ const server = http.createServer(async (req, res) => {
     if (err) {
       // SPA fallback for client-side routes.
       return fs.readFile(path.join(ROOT, 'index.html'), (e2, html) => {
-        res.writeHead(e2 ? 404 : 200, { 'content-type': TYPES['.html'] });
+        res.writeHead(e2 ? 404 : 200, { 'content-type': TYPES['.html'], 'cache-control': 'no-cache' });
         res.end(e2 ? 'not found' : html);
       });
     }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    // Revalidate on every load so a redeploy reaches browsers at once.
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' });
     res.end(buf);
   });
-});
+}
 
-server.listen(PORT, HOST, () => console.log(`OS AI // TRADING running on http://localhost:${PORT}`));
+http.createServer(handle).listen(PORT, HOST, () => console.log(`OS AI // TRADING running on http://localhost:${PORT}`));
+
+// The primary also listens on a local socket that standby copies forward to.
+function becomePrimary() {
+  if (!SOCKET) return;
+  try { fs.unlinkSync(SOCKET); } catch { /* none left over */ }
+  http.createServer(handle).listen(SOCKET).on('error', (e) => console.error(`Could not open ${SOCKET}: ${e.message}`));
+}
+if (primary) becomePrimary();
