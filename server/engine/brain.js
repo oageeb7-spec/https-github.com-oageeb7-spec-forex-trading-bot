@@ -109,6 +109,8 @@ export class Brain {
 
   emit(kind, text, agent) {
     this.log.push({ t: this.now, kind, text, agent });
+    // Agent failures also go to the server log, so they show up in the host's logs.
+    if (kind === 'ERROR' && !process.env.NODE_TEST_CONTEXT) console.error(`[agent] ${text}`);
     if (this.log.length > 300) this.log.splice(0, 100);
     const minute = Math.floor(this.now / 60000);
     const last = this.activity[this.activity.length - 1];
@@ -199,6 +201,10 @@ export class Brain {
     }
     this.paperStep();
     if (this.tickNo % 20 === 0) this.budget.history.push({ t: now, spent: round(this.budget.spent, 3) });
+    if (this.tickNo % 400 === 0 && !process.env.NODE_TEST_CONTEXT) {
+      const c = this.c, busy = Object.values(this.agents).filter((a) => a.status !== 'idle').map((a) => `${a.name}:${a.status}`);
+      console.log(`[brain] round ${this.tickNo} · sources ${c.sources} read ${c.read} summarized ${c.summarized} rejected ${c.sourceRejected} · recipes ${c.recipes} tested ${c.tested} validated ${c.validated} · paper ${this.paper.size} · queues ${Object.entries(this.queues).map(([k, v]) => `${k}=${v.length}`).join(' ')} · ${busy.join(', ') || 'all idle'}`);
+    }
     if (this.budget.history.length > 200) this.budget.history.shift();
   }
 
