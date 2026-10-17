@@ -42,6 +42,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .voice { display: flex; align-items: center; gap: 8px; margin-right: 6px; max-width: 280px; min-width: 0; }
 #voice-text { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0; }
 #voice-text.heard { color: var(--text); font-style: italic; }
+.voice-input { width: 140px; height: 26px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 4px; background: transparent; color: var(--text); font: 11px var(--mono); }
 .voice-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2); background: transparent; font-size: 13px; line-height: 1; }
 .voice-btn.on { border-color: var(--green); box-shadow: 0 0 0 3px rgba(74,222,128,.15), 0 0 12px rgba(74,222,128,.5); animation: pulse 1.6s ease-in-out infinite; }
 .voice-btn:disabled { opacity: .35; cursor: not-allowed; }
@@ -209,6 +210,8 @@ input[type=text], input[type=number] { background: #0a0d11; border: 1px solid va
 @media (max-width: 760px) {
   .sidebar { display: none; }
   .topbar .pill, .top-stat { display: none; }
+  #voice-text { display: none; }
+  .voice-input { width: 110px; }
   main { padding: 12px 10px; }
   .grid { grid-template-columns: 1fr !important; }
   .kpis { grid-template-columns: repeat(2, 1fr); }

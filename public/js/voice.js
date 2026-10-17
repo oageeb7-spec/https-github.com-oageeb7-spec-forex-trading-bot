@@ -11,21 +11,35 @@ const PAGES = {
 };
 
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false, state = null, pending = null, announce = false, lastLogT = 0;
+const EMBEDDED = window.top !== window.self;
+let rec = null, listening = false, speaking = false, state = null, pending = null, announce = false, lastLogT = 0, restartTimer = 0;
 
+// Commands are English, so recognise English even when the browser is set to another language.
+const LANG = /^en\b/i.test(navigator.language || '') ? navigator.language : 'en-GB';
+
+// Speak a reply. The microphone is paused while OS AI talks so it never hears itself and
+// mistakes its own answer for a new command.
 function say(text) {
+  show(text);
   if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.03;
-  speechSynthesis.speak(u);
-  show(text);
+  speaking = true;
+  pauseMic();
+  const parts = text.match(/[^.?!]+[.?!]*/g) || [text]; // Chrome cuts long utterances, so speak sentence by sentence
+  parts.forEach((part, i) => {
+    const u = new SpeechSynthesisUtterance(part.trim());
+    u.lang = LANG;
+    u.rate = 1.03;
+    if (i === parts.length - 1) u.onend = u.onerror = () => { speaking = false; resumeMic(); };
+    setTimeout(() => speechSynthesis.speak(u), 0); // speaking straight after cancel() is dropped in Chrome
+  });
 }
 
 function show(text, heard) {
   const el = $('#voice-text');
   if (!el) return;
   el.textContent = heard ? `"${heard}"` : text;
+  el.title = el.textContent;
   el.classList.toggle('heard', !!heard);
 }
 
@@ -43,7 +57,9 @@ const HELP = 'You can say: status. Go to lab, research, strategies, knowledge, a
 
 export async function handle(raw) {
   const t = raw.toLowerCase().replace(/[.!?,]/g, '').trim();
+  if (!t) return;
   show('', raw);
+  if (!state) return say('Still connecting to OS AI. Try again in a moment.');
 
   if (pending) {
     const p = pending;
@@ -88,27 +104,52 @@ export async function handle(raw) {
   return say(`Sorry, I didn't catch a command in "${raw}". Say help to hear what I can do.`);
 }
 
+const ERRORS = {
+  'not-allowed': EMBEDDED
+    ? 'Microphone is blocked inside this page. Open OS AI in its own tab at app.ostradingai.com, or type a command.'
+    : 'Microphone access is blocked. Click the lock icon in the address bar, allow the microphone, then try again.',
+  'service-not-allowed': 'This browser does not allow speech recognition here. Use Chrome or Edge, or type a command.',
+  'audio-capture': 'No microphone was found. Plug one in, or type a command.',
+  network: 'Speech recognition needs an internet connection. Type a command instead.',
+};
+
 function start() {
-  if (!Recognition) return;
   rec = new Recognition();
-  rec.lang = navigator.language || 'en-US';
-  rec.continuous = true;
+  rec.lang = LANG;
+  rec.continuous = false; // one phrase per session, restarted after each: steadier on Safari and Android
   rec.interimResults = false;
+  rec.maxAlternatives = 1;
   rec.onresult = (e) => {
+    if (speaking) return;
     const r = e.results[e.results.length - 1];
     if (r.isFinal) handle(r[0].transcript).catch((err) => say(`Something went wrong: ${err.message}`));
   };
-  rec.onerror = (e) => { if (e.error === 'not-allowed') { stop(); say('Microphone access was blocked. Allow it in the browser to use voice.'); } };
-  rec.onend = () => { if (listening) try { rec.start(); } catch { /* already restarting */ } };
+  rec.onerror = (e) => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return; // silence: just listen again
+    stop();
+    say(ERRORS[e.error] || `Voice stopped: ${e.error}. Type a command instead.`);
+  };
+  rec.onend = () => resumeMic();
   listening = true;
-  rec.start();
   $('#voice-btn').classList.add('on');
+  $('#voice-input').hidden = false;
   say('Listening. Say help to hear what I can do.');
+}
+
+function pauseMic() {
+  clearTimeout(restartTimer);
+  try { rec?.abort(); } catch { /* not running */ }
+}
+
+function resumeMic() {
+  clearTimeout(restartTimer);
+  if (!listening || speaking || !rec) return;
+  restartTimer = setTimeout(() => { try { rec.start(); } catch { /* already running */ } }, 250);
 }
 
 function stop() {
   listening = false;
-  try { rec?.stop(); } catch { /* not running */ }
+  pauseMic();
   $('#voice-btn')?.classList.remove('on');
 }
 
@@ -125,11 +166,20 @@ export function voiceState(s) {
 }
 
 export function initVoice() {
-  const btn = $('#voice-btn');
+  const btn = $('#voice-btn'), input = $('#voice-input');
   if (!btn) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const cmd = input.value;
+    input.value = '';
+    handle(cmd).catch((err) => say(`Something went wrong: ${err.message}`));
+  });
   if (!Recognition) {
-    btn.disabled = true;
-    btn.title = 'Voice needs Chrome, Edge or Safari';
+    btn.title = 'This browser cannot listen (use Chrome, Edge or Safari). Click to type commands instead.';
+    btn.addEventListener('click', () => {
+      input.hidden = !input.hidden;
+      if (!input.hidden) { input.focus(); show('This browser cannot listen. Type a command, e.g. status or help.'); }
+    });
     return;
   }
   btn.addEventListener('click', () => (listening ? (stop(), say('Voice off.')) : start()));
