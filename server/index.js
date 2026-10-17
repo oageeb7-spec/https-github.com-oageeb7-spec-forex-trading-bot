@@ -1,3 +1,4 @@
+import './env.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +22,8 @@ const WARMUP = Number(process.env.WARMUP ?? (SIMULATED ? 150 : 0));
 const DEMO = (process.env.DEMO ?? (SIMULATED ? '1' : '0')) !== '0';
 
 if (SOURCE === 'oanda' && !OANDA_KEY) {
-  console.error('Real market data needs an OANDA API token: OANDA_API_KEY=your-token npm start\n'
+  console.error('Real market data needs an OANDA API token. Copy .env.example to .env and set OANDA_API_KEY,\n'
+    + 'or run: OANDA_API_KEY=your-token npm start\n'
     + 'Get one free from an OANDA practice account (My Account → Manage API Access).\n'
     + 'To run on generated prices instead: DATA_SOURCE=synthetic npm start');
   process.exit(1);

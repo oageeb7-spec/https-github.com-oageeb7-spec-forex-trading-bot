@@ -2,9 +2,9 @@ import { $, esc, num, pct, usd, spark } from '../ui.js';
 
 let root;
 
-function card(p) {
+function card(p, feed) {
   const live = p.status === 'live';
-  return `<div class="panel"><div class="ph"><span class="t">${esc(p.name)}</span><span class="r ${live ? 'green' : ''}">${live ? 'LIVE · simulated feed' : `paper · day ${p.day} of ${p.days}`}</span></div>
+  return `<div class="panel"><div class="ph"><span class="t">${esc(p.name)}</span><span class="r ${live ? 'green' : ''}">${live ? `LIVE · ${feed} · no orders sent` : `paper · day ${p.day} of ${p.days}`}</span></div>
     <div class="pb">
       ${live ? '' : `<div style="height:3px;background:var(--line-2);margin-bottom:12px"><i style="display:block;height:100%;width:${(p.day / p.days) * 100}%;background:var(--green)"></i></div>`}
       <div class="grid" style="grid-template-columns:repeat(4,1fr)">
@@ -22,12 +22,12 @@ export default {
   mount(el, s) {
     root = el;
     el.innerHTML = `<div class="panel" style="margin-bottom:12px"><div class="pb dim">Approved strategies trade on the forward market feed with 1 standard lot for ${s.paper[0]?.days ?? 21} trading days.
-      Profitable ones are proposed for live. Live runs on the same feed until a broker adapter is connected — no real orders are sent.</div></div><div class="grid" id="pp" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))"></div>`;
+      Profitable ones are proposed for live. ${s.data.source === 'oanda' ? `Prices come from OANDA (${s.data.env}).` : 'Prices are generated (demo mode).'} Live runs on the same feed until a broker adapter is connected — no real orders are sent.</div></div><div class="grid" id="pp" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))"></div>`;
     this.update(s);
   },
   update(s) {
     if (!root) return;
-    $('#pp', root).innerHTML = s.paper.length ? s.paper.slice().reverse().map(card).join('') : '<div class="empty">Nothing on paper yet. Approve a validated strategy under Decisions.</div>';
+    $('#pp', root).innerHTML = s.paper.length ? s.paper.slice().reverse().map((p) => card(p, s.data.source === 'oanda' ? `OANDA ${s.data.env} prices` : 'generated prices')).join('') : '<div class="empty">Nothing on paper yet. Approve a validated strategy under Decisions.</div>';
   },
   unmount() { root = null; },
 };

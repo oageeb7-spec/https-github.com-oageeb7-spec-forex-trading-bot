@@ -6,7 +6,8 @@ robustness sieve, and paper-trades the ones **you** approve.
 
 ```bash
 npm install
-OANDA_API_KEY=your-oanda-token ANTHROPIC_API_KEY=your-anthropic-key npm start   # http://localhost:3000
+cp .env.example .env   # then put your OANDA (and optionally Anthropic) keys in .env
+npm start              # http://localhost:3000
 npm run demo    # fully simulated: generated prices and research, no keys needed
 npm test
 ```
