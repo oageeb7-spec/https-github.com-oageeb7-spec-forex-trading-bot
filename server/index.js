@@ -98,7 +98,7 @@ function readBody(req) {
 // When hosted publicly: a password protects the dashboard, and only these sites may embed it
 // (your Shopify store), so nobody else can frame or open your trading data.
 const PASSWORD = process.env.DASHBOARD_PASSWORD || '';
-const FRAME_ANCESTORS = process.env.FRAME_ANCESTORS || "'self' https://*.myshopify.com https://admin.shopify.com";
+const FRAME_ANCESTORS = process.env.FRAME_ANCESTORS || "'self' https://ostradingai.com https://*.ostradingai.com https://*.myshopify.com https://admin.shopify.com";
 
 function authorized(req) {
   if (!PASSWORD) return true;

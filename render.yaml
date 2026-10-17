@@ -8,6 +8,8 @@ services:
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /healthz
+    domains:
+      - app.ostradingai.com # point a CNAME for app.ostradingai.com at the Render address
     envVars:
       - key: NODE_VERSION
         value: 22

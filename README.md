@@ -46,7 +46,9 @@ host and your store shows it on a page.
 2. **Store page:** in Shopify admin, *Online Store → Pages → Add page*, switch the editor to
    HTML and paste `docs/shopify-page.html` with your host's address filled in. Keep the page
    hidden from the store menu.
-3. If your store uses its own domain, add it to `FRAME_ANCESTORS`.
+3. The dashboard is set up for **app.ostradingai.com**: in your domain's DNS, add a CNAME record
+   `app` pointing at the Render address (Render shows it under *Settings → Custom Domains*).
+   The store page then lives at `https://ostradingai.com/pages/os-ai`.
 
 With `DASHBOARD_PASSWORD` set, every page and API call needs that password (any username).
 `/healthz` stays open for the host's health check.
