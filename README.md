@@ -44,6 +44,7 @@ load, the server stops rather than inventing prices.
 | `DASHBOARD_PASSWORD` | — | Password for the dashboard when hosted publicly |
 | `FRAME_ANCESTORS` | your Shopify domains | Sites allowed to embed the dashboard |
 | `STATE_FILE` | `~/.os-ai/state.json` | Where strategies, paper trades, decisions and research are saved so restarts and redeploys keep them (not used by `npm run demo`) |
+| `BRIDGE_TOKEN` | — | Lets the MetaTrader EA connect; see [docs/METATRADER.md](docs/METATRADER.md) for this and the `LIVE_LOTS`, `MAX_LOTS`, `MAX_OPEN_TRADES`, `MAX_DAILY_LOSS` limits |
 | `PORT`    | `3000`  | HTTP port |
 | `TICK_MS` | `1500`  | One brain round every N ms |
 | `WARMUP`, `DEMO` | on in `npm run demo` only | Pre-run rounds and auto-approval of the first two paper proposals |
@@ -146,10 +147,22 @@ Research galaxy · Strategies (key figures, equity + drawdown, monthly robustnes
 Knowledge base (card-by-card check) · Agent room (3D work floor) · Paper & live · Decisions ·
 Costs · Machines.
 
+## Voice
+
+Click the microphone in the top bar (Chrome, Edge or Safari) and speak: "status", "go to the
+lab", "read decisions", "approve" (then "yes"), "kill switch", "announcements on", "help". Voice
+never arms real trading or approves a live strategy; do those on screen.
+
+## Live trading on MT4 / MT5
+
+Strategies you approve to Live can send real orders to MetaTrader through the OS AI EA in `mt/`,
+with lot caps, a maximum number of open trades, a daily loss limit and a kill switch. Setup and
+limits: [docs/METATRADER.md](docs/METATRADER.md).
+
 ## What is still not real
 
-- **Live** trading sends no orders: there is no broker adapter. "Live" strategies keep running
-  on the OANDA price feed.
+- **The MetaTrader EAs** have not been compiled or run against a broker yet; test on a demo
+  account first.
 - **Video research** reads titles and descriptions only; the YouTube Data API does not provide
   transcripts.
 

@@ -14,6 +14,7 @@ const VARIANTS_PER_RECIPE = 10;
 const BARS_PER_PAPER_DAY = 24;
 const PAPER_DAYS = 21;
 const SCOUT_MS = Number(process.env.RESEARCH_SCOUT_MS) || 45000;
+const LAB_BACKLOG = 30;
 
 const TOPICS = [
   { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx' },
@@ -50,7 +51,7 @@ export const AGENTS = [
 export class Brain {
   // `feeds` (symbol → feed with .bars) lets real market data replace the synthetic generator.
   // `research` (see server/research) switches the agents from simulated sources to real ones.
-  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' }, research = null } = {}) {
+  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' }, research = null, bridge = null } = {}) {
     this.r = rng(seed);
     this.started = Date.now();
     this.tickNo = 0;
@@ -59,6 +60,7 @@ export class Brain {
     this.settings = { earlyCostCheck: false, paused: false };
     this.data = data;
     this.research = research;
+    this.bridge = bridge; // MetaTrader bridge for live strategies (server/engine/bridge.js)
     this.cost = research ? Object.fromEntries(Object.keys(COST).map((k) => [k, 0])) : COST; // live mode bills real LLM usage only
     this.seenUrls = new Set();
     this.scoutN = 0;
@@ -394,6 +396,8 @@ export class Brain {
   }
 
   makeRecipes() {
+    // Back-pressure: hold new recipes while the lab has a backlog, so tests stay current.
+    if (this.queues.toLab.length >= LAB_BACKLOG) return;
     const src = this.queues.toRecipe.shift();
     if (!src) return;
     const an = src.analysis;
@@ -619,12 +623,16 @@ export class Brain {
           p.equity.push(p.equity[p.equity.length - 1] + pnl);
           p.pos = null;
           this.emit(s.status === 'live' ? 'LIVE' : 'PAPER', `${s.name} closed ${o.dir > 0 ? 'long' : 'short'} · ${pnl >= 0 ? '+' : ''}$${Math.round(pnl)}`, 'lab');
+          if (s.status === 'live' && this.bridge?.configured) this.liveOrder(s, this.bridge.close(s), 'close');
         }
       } else {
         const sig = TEMPLATES[s.template].signals(bars, s.params).filter((x) => x.i === bars.length - 1)[0];
-        if (sig && !sig.entry) {
-          p.pos = { dir: sig.dir, entry: last.c, stop: sig.stop, target: sig.target, maxBars: sig.maxBars, held: 0, t: last.t };
-          this.emit(s.status === 'live' ? 'LIVE' : 'PAPER', `${s.name} opened ${sig.dir > 0 ? 'long' : 'short'} at ${last.c.toFixed(inst.digits)}`, 'lab');
+        if (sig) {
+          // Limit entries (fair value gap) fill at their limit price inside the bar.
+          const entry = sig.entry ?? last.c;
+          p.pos = { dir: sig.dir, entry, stop: sig.stop, target: sig.target, maxBars: sig.maxBars, held: 0, t: last.t };
+          this.emit(s.status === 'live' ? 'LIVE' : 'PAPER', `${s.name} opened ${sig.dir > 0 ? 'long' : 'short'} at ${entry.toFixed(inst.digits)}`, 'lab');
+          if (s.status === 'live' && this.bridge?.configured) this.liveOrder(s, this.bridge.open(s, p.pos), 'open');
         }
       }
       const day = Math.floor(p.bars / (s.tf === '1h' ? BARS_PER_PAPER_DAY : BARS_PER_PAPER_DAY / 4));
@@ -635,6 +643,11 @@ export class Brain {
         else this.emit('PAPER', `${s.name} finished paper at $${Math.round(net)} · not proposed for live`, 'director');
       }
     }
+  }
+
+  liveOrder(s, r, what) {
+    if (r.order) this.emit('ORDER', `${what === 'open' ? `${r.order.dir.toUpperCase()} ${r.order.lots} lot` : 'Close'} ${s.symbol} sent to MetaTrader for ${s.name} (order ${r.order.seq})`, 'director');
+    else this.emit('ORDER', `${s.name}: no real ${what} order (${r.blocked})`, 'director');
   }
 
   // ---------- persistence ----------
@@ -655,6 +668,7 @@ export class Brain {
       terms: this.terms, paper: [...this.paper.entries()], reports: this.reports,
       knowledge: this.knowledge.map(({ id, step, verdict, note }) => ({ id, step, verdict, note })),
       agentsDone: Object.fromEntries(Object.values(this.agents).map((a) => [a.id, a.done])),
+      bridge: this.bridge?.save(),
     };
   }
 
@@ -675,6 +689,7 @@ export class Brain {
     };
     for (const k of s.knowledge) Object.assign(this.knowledge.find((x) => x.id === k.id) || {}, k);
     for (const [id, n] of Object.entries(s.agentsDone || {})) if (this.agents[id]) this.agents[id].done = n;
+    this.bridge?.restore(s.bridge);
     this.emit('RESTORE', `State restored from ${new Date(s.savedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC · ${this.strategies.size} strategies, ${this.paper.size} on paper, ${this.decisions.filter((d) => d.status === 'pending').length} decisions waiting`, 'director');
     return true;
   }
@@ -728,6 +743,7 @@ export class Brain {
         return { id: k.id, name: c.name, aka: c.aka, category: c.category, tag: c.tag, step: k.step, verdict: k.verdict, note: k.note, found: k.stats.found, followRate: k.stats.followRate };
       }),
       machines: machineStats(),
+      bridge: this.bridge ? this.bridge.view() : null,
       data: {
         ...this.data,
         symbols: this.symbols.map((s) => {

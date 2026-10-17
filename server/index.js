@@ -9,6 +9,7 @@ import { Brain } from './engine/brain.js';
 import { loadOandaFeeds } from './engine/oanda.js';
 import { loadYahooFeeds } from './engine/yahoo.js';
 import { createResearch } from './research/index.js';
+import { Bridge } from './engine/bridge.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const THREE_DIR = path.join(ROOT, '..', 'node_modules', 'three');
@@ -71,12 +72,55 @@ if (SOURCE === 'oanda') {
 
 const research = RESEARCH === 'live' ? createResearch() : null;
 if (research) console.log(`Research: live sources (${research.kinds.join(', ')}) · analyst: ${research.analyst.label}`);
-const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research });
+// MetaTrader bridge (real orders). Inactive without BRIDGE_TOKEN; never armed at start.
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN || '';
+const bridge = new Bridge({
+  token: BRIDGE_TOKEN,
+  lots: Number(process.env.LIVE_LOTS) || 0.01,
+  maxLots: Number(process.env.MAX_LOTS) || 0.1,
+  maxOpen: Number(process.env.MAX_OPEN_TRADES) || 3,
+  maxDailyLoss: Number(process.env.MAX_DAILY_LOSS) || 100,
+  passwordSet: Boolean(process.env.DASHBOARD_PASSWORD),
+});
+const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research, bridge });
 
 // State survives restarts (hosts restart idle apps). Kept outside the app folder so redeploys keep
 // it too. The fully simulated demo does not persist unless STATE_FILE is set.
 const STATE_FILE = process.env.STATE_FILE || (SIMULATED ? '' : path.join(os.homedir(), '.os-ai', 'state.json'));
 let restored = false;
+
+// Some hosts run several copies of the app. Only the copy holding this lock saves state and talks to
+// MetaTrader; the others stay on standby (no bridge) so real orders can never be duplicated.
+const LOCK_FILE = STATE_FILE ? `${STATE_FILE}.lock` : '';
+let primary = !LOCK_FILE;
+function tryLock() {
+  if (primary) return true;
+  try {
+    fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
+    try {
+      const pid = Number(fs.readFileSync(LOCK_FILE, 'utf8'));
+      if (pid && pid !== process.pid) {
+        try { process.kill(pid, 0); return false; } catch { fs.unlinkSync(LOCK_FILE); } // holder is gone
+      }
+    } catch { /* no lock yet */ }
+    fs.writeFileSync(LOCK_FILE, String(process.pid), { flag: 'wx' });
+    primary = true;
+  } catch { primary = false; }
+  return primary;
+}
+tryLock();
+if (!primary) {
+  bridge.token = '';
+  console.log('Standby copy: another copy holds the lock and runs the MetaTrader bridge');
+  const retry = setInterval(() => {
+    if (!tryLock()) return;
+    clearInterval(retry);
+    bridge.token = BRIDGE_TOKEN;
+    try { brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))); } catch { /* nothing saved yet */ }
+    console.log('This copy took over as primary');
+  }, 30000);
+  retry.unref();
+}
 if (STATE_FILE && fs.existsSync(STATE_FILE)) {
   try {
     restored = brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')));
@@ -86,7 +130,7 @@ if (STATE_FILE && fs.existsSync(STATE_FILE)) {
   }
 }
 function saveState() {
-  if (!STATE_FILE) return;
+  if (!STATE_FILE || !primary) return;
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
     fs.writeFileSync(`${STATE_FILE}.tmp`, JSON.stringify(brain.save()));
@@ -96,7 +140,11 @@ function saveState() {
   }
 }
 setInterval(saveState, 30000).unref();
-for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => { saveState(); process.exit(0); });
+for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => {
+  saveState();
+  if (primary && LOCK_FILE) try { fs.unlinkSync(LOCK_FILE); } catch { /* already gone */ }
+  process.exit(0);
+});
 
 // Warm up so the dashboard opens with history: ticks are spread over the last WARMUP×12s.
 const t0 = Date.now() - WARMUP * 12000;
@@ -122,6 +170,24 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 function json(res, code, body) {
   res.writeHead(code, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body));
+}
+
+function text(res, code, body) {
+  res.writeHead(code, { 'content-type': 'text/plain; charset=utf-8' });
+  res.end(body);
+}
+
+function readText(req) {
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', (c) => { if (data.length < 200_000) data += c; });
+    req.on('end', () => resolve(data));
+  });
+}
+
+function sameSecret(a, b) {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && y.length > 0 && crypto.timingSafeEqual(x, y);
 }
 
 function readBody(req) {
@@ -155,6 +221,16 @@ const server = http.createServer(async (req, res) => {
 
   res.setHeader('Content-Security-Policy', `frame-ancestors ${FRAME_ANCESTORS}`);
   if (p === '/healthz') return json(res, 200, { ok: true });
+
+  // The MetaTrader EA authenticates with its own token instead of the dashboard password.
+  if (p === '/api/bridge/orders' || p === '/api/bridge/report') {
+    if (!bridge.configured) return text(res, 503, primary ? 'bridge not configured' : 'standby copy, retry');
+    if (!sameSecret(req.headers['x-osai-token'] || '', bridge.token)) return text(res, 401, 'bad token');
+    if (p === '/api/bridge/orders') return text(res, 200, bridge.pending(Number(url.searchParams.get('after')) || 0));
+    const out = bridge.report(await readText(req));
+    publish(), saveState();
+    return text(res, 200, out);
+  }
   if (!authorized(req)) {
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="OS AI", charset="UTF-8"' });
     return res.end('Password required');
@@ -188,6 +264,22 @@ const server = http.createServer(async (req, res) => {
     const done = brain.verdict(m[1], !!ok, String(note || '').slice(0, 500));
     if (done) publish(), saveState();
     return json(res, done ? 200 : 404, { ok: done });
+  }
+  if (req.method === 'POST' && p === '/api/bridge/arm') {
+    if (!primary) return json(res, 503, { error: 'This copy is on standby; try again.' });
+    const { armed } = await readBody(req);
+    const err = bridge.arm(Boolean(armed));
+    if (err) return json(res, 409, { error: err });
+    brain.emit('LIVE', armed ? 'You armed live trading on MetaTrader' : 'You disarmed live trading', 'director');
+    publish(), saveState();
+    return json(res, 200, { ok: true });
+  }
+  if (req.method === 'POST' && p === '/api/bridge/kill') {
+    if (!primary) return json(res, 503, { error: 'This copy is on standby; try again.' });
+    bridge.kill();
+    brain.emit('LIVE', 'KILL SWITCH: live trading stopped, closing all OS AI positions', 'director');
+    publish(), saveState();
+    return json(res, 200, { ok: true });
   }
   if (req.method === 'POST' && p === '/api/budget') {
     const { limit } = await readBody(req);

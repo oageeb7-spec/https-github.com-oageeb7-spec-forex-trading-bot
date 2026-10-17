@@ -57,8 +57,12 @@ export const TEMPLATES = {
     params: [P('lookback', 120, 24, 400), P('hold', 48, 12, 160), P('stopAtr', 4, 2, 7, false)],
     signals(bars, p) {
       const c = bars.map((b) => b.c), a = atr(bars);
+      // Rebalance on a clock anchored to time, not to the window start, so a sliding live
+      // window keeps the same rebalance bars as the backtest.
+      const step = bars.length > 1 ? Math.min(...bars.slice(1, 50).map((b, k) => b.t - bars[k].t)) : 3600_000;
       const out = [];
-      for (let i = p.lookback; i < bars.length; i += p.hold) {
+      for (let i = p.lookback; i < bars.length; i++) {
+        if (Math.round(bars[i].t / step) % p.hold !== 0) continue;
         const dir = Math.sign(c[i] - c[i - p.lookback]);
         if (dir) out.push({ i, dir, stop: c[i] - dir * a[i] * p.stopAtr, target: dir * Infinity, maxBars: p.hold });
       }

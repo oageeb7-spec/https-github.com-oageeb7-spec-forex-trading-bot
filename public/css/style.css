@@ -39,6 +39,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .top-stat .lbl { font-size: 9px; color: var(--dim); }
 .top-stat b { font-weight: 500; }
 .clock { font-size: 15px; margin-left: 12px; }
+.voice { display: flex; align-items: center; gap: 8px; margin-right: 6px; max-width: 280px; min-width: 0; }
+#voice-text { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0; }
+#voice-text.heard { color: var(--text); font-style: italic; }
+.voice-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2); background: transparent; font-size: 13px; line-height: 1; }
+.voice-btn.on { border-color: var(--green); box-shadow: 0 0 0 3px rgba(74,222,128,.15), 0 0 12px rgba(74,222,128,.5); animation: pulse 1.6s ease-in-out infinite; }
+.voice-btn:disabled { opacity: .35; cursor: not-allowed; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(74,222,128,.08), 0 0 18px rgba(74,222,128,.6); } }
 .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dimmer); }
 .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .dot.amber { background: var(--amber); } .dot.red { background: var(--red); }

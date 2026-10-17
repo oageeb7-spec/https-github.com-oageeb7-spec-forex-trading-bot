@@ -1,4 +1,5 @@
 import { $, $$, esc, time, usd } from './ui.js';
+import { initVoice, voiceState } from './voice.js';
 import overview from './views/overview.js';
 import lab from './views/lab.js';
 import research from './views/research.js';
@@ -61,12 +62,14 @@ function onState(s) {
   const first = !state;
   state = s;
   chrome(s);
+  voiceState(s);
   if (first) route();
   else current?.update?.(s);
 }
 
 setInterval(() => ($('#clock').textContent = time(Date.now())), 1000);
 window.addEventListener('hashchange', route);
+initVoice();
 window.addEventListener('brain:refresh', async () => onState(await (await fetch('/api/state')).json()));
 
 function connect() {
