@@ -1,6 +1,7 @@
 import './env.js';
 import http from 'node:http';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Brain } from './engine/brain.js';
@@ -10,6 +11,7 @@ import { createResearch } from './research/index.js';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const THREE_DIR = path.join(ROOT, '..', 'node_modules', 'three');
 const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 const TICK_MS = Number(process.env.TICK_MS) || 1500;
 
 const OANDA_KEY = process.env.OANDA_API_KEY;
@@ -93,10 +95,31 @@ function readBody(req) {
   });
 }
 
+// When hosted publicly: a password protects the dashboard, and only these sites may embed it
+// (your Shopify store), so nobody else can frame or open your trading data.
+const PASSWORD = process.env.DASHBOARD_PASSWORD || '';
+const FRAME_ANCESTORS = process.env.FRAME_ANCESTORS || "'self' https://*.myshopify.com https://admin.shopify.com";
+
+function authorized(req) {
+  if (!PASSWORD) return true;
+  const [scheme, value] = (req.headers.authorization || '').split(' ');
+  if (scheme !== 'Basic' || !value) return false;
+  const pass = Buffer.from(value, 'base64').toString().split(':').slice(1).join(':');
+  const a = Buffer.from(pass), b = Buffer.from(PASSWORD);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   let m;
+
+  res.setHeader('Content-Security-Policy', `frame-ancestors ${FRAME_ANCESTORS}`);
+  if (p === '/healthz') return json(res, 200, { ok: true });
+  if (!authorized(req)) {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="OS AI", charset="UTF-8"' });
+    return res.end('Password required');
+  }
 
   if (p === '/api/state') return json(res, 200, JSON.parse(latest));
   if (p === '/api/stream') {
@@ -153,4 +176,4 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => console.log(`OS AI // TRADING running on http://localhost:${PORT}`));
+server.listen(PORT, HOST, () => console.log(`OS AI // TRADING running on http://localhost:${PORT}`));

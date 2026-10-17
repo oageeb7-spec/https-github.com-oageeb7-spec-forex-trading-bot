@@ -29,9 +29,27 @@ The server refuses to start without `OANDA_API_KEY` rather than inventing prices
 | `DATA_SOURCE` | `oanda` | `synthetic` for generated prices |
 | `RESEARCH` | `live` | `simulated` for generated research |
 | `BUDGET`  | `50`    | Thinking budget in USD (real Claude spend in live mode); research pauses at the limit |
+| `DASHBOARD_PASSWORD` | — | Password for the dashboard when hosted publicly |
+| `FRAME_ANCESTORS` | your Shopify domains | Sites allowed to embed the dashboard |
 | `PORT`    | `3000`  | HTTP port |
 | `TICK_MS` | `1500`  | One brain round every N ms |
 | `WARMUP`, `DEMO` | on in `npm run demo` only | Pre-run rounds and auto-approval of the first two paper proposals |
+
+## Host it and show it in your Shopify store
+
+Shopify cannot run OS AI itself (it needs a server that stays on), so OS AI runs on a small
+host and your store shows it on a page.
+
+1. **Host:** on render.com choose *New → Blueprint* and pick this repository. `render.yaml`
+   sets everything up; Render then asks for `OANDA_API_KEY`, `ANTHROPIC_API_KEY` and
+   `DASHBOARD_PASSWORD`. Any Node 18+ host works the same way with `npm ci && npm start`.
+2. **Store page:** in Shopify admin, *Online Store → Pages → Add page*, switch the editor to
+   HTML and paste `docs/shopify-page.html` with your host's address filled in. Keep the page
+   hidden from the store menu.
+3. If your store uses its own domain, add it to `FRAME_ANCESTORS`.
+
+With `DASHBOARD_PASSWORD` set, every page and API call needs that password (any username).
+`/healthz` stays open for the host's health check.
 
 ## Live research
 
