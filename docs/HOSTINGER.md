@@ -11,7 +11,7 @@ OS AI runs as a Node.js web app on the Cloud Startup plan at **https://app.ostra
   OS AI data with no key; `OANDA_API_KEY` is optional.
 - **Code updates:** run `scripts/publish-hostinger-package.sh`, then in Hostinger pull
   `deploy-src` (Git deploy of branch `hostinger-deploy`) and start a Node.js build from
-  `deploy-src/os-ai-app.zip` (Node 22, Express, entry `server/index.js`, build script `build`).
+  `deploy-src/os-ai-app.zip` (Node 22, Express, entry `server/start.cjs`, build script `build`).
 - Hostinger's web hosting may pause idle Node.js apps; if the agents stop between visits,
   use a VPS with the script below instead.
 
