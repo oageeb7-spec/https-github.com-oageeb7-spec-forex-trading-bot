@@ -82,6 +82,6 @@ Costs · Machines.
   LLM yet. The pipeline boundaries (`scout`, `read`, `summarize`, `makeRecipes`) are where real
   search and LLM calls plug in.
 - **Live** trading sends no orders: there is no broker adapter. Live strategies keep running on
-  the simulated feed.
+  the market feed (OANDA or synthetic).
 
 Nothing here is financial advice.
