@@ -1,0 +1,28 @@
+<p><strong>OS Trading AI</strong> is a self-hosted research system for forex strategies. A team of AI agents finds trading ideas in real sources, turns them into testable strategies, backtests them on real OANDA price data, and paper-trades the ones you approve — all shown in a live dashboard.</p>
+
+<h3>What it does</h3>
+<ul>
+  <li><strong>Research agents</strong> search arXiv papers, GitHub repositories and web articles (plus YouTube with your own key), read them, and extract the trading rule each one describes.</li>
+  <li><strong>Claude-powered analysis</strong> decides whether a source describes a rule that can be tested, which currency pairs it targets and which settings it uses. A free keyword mode works without an Anthropic key.</li>
+  <li><strong>Backtesting lab</strong> tests 10 variants of every strategy on about 1.5 years of hourly OANDA data, with real bid/ask spreads.</li>
+  <li><strong>Five-check robustness sieve</strong>: out-of-sample results, settings changed ±20%, a second currency pair, triple spread costs, and month-by-month consistency.</li>
+  <li><strong>Paper trading</strong> on live OANDA prices for 21 trading days before anything is proposed for live.</li>
+  <li><strong>Dashboard</strong> with ten screens, including a 3D room showing each agent at work, a knowledge base of trading concepts, and a cost tracker.</li>
+</ul>
+
+<h3>What you get</h3>
+<ul>
+  <li>The full source code as a ZIP download (Node.js)</li>
+  <li>Setup instructions in the included README</li>
+  <li>A demo mode that runs without any API keys</li>
+</ul>
+
+<h3>Requirements</h3>
+<ul>
+  <li>A computer or server with Node.js 18 or newer</li>
+  <li>A free OANDA practice account API token for real prices</li>
+  <li>Optional: an Anthropic API key for Claude analysis (billed by Anthropic, capped by a budget you set)</li>
+</ul>
+
+<h3>Please note</h3>
+<p>OS Trading AI is a research and education tool. It does not place real orders and makes no promise of profits. Backtested and paper-trading results do not guarantee future performance. Nothing in this product is financial advice. Trading foreign exchange carries a high level of risk.</p>

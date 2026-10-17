@@ -1,0 +1,22 @@
+{
+  "name": "os-trading-ai",
+  "version": "0.1.0",
+  "description": "Agentic forex research and trading system: agents find sources, write strategy recipes, backtest variants, run a robustness sieve and paper-trade what you approve.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "TICK_MS=800 node --watch server/index.js",
+    "test": "node --test test/*.test.js",
+    "demo": "DATA_SOURCE=synthetic RESEARCH=simulated node server/index.js",
+    "build": "echo 'OS AI has no build step'"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "three": "^0.160.0"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}
