@@ -43,6 +43,7 @@ load, the server stops rather than inventing prices.
 | `BUDGET`  | `50`    | Thinking budget in USD (real Claude spend in live mode); research pauses at the limit |
 | `DASHBOARD_PASSWORD` | — | Password for the dashboard when hosted publicly |
 | `FRAME_ANCESTORS` | your Shopify domains | Sites allowed to embed the dashboard |
+| `STATE_FILE` | `~/.os-ai/state.json` | Where strategies, paper trades, decisions and research are saved so restarts and redeploys keep them (not used by `npm run demo`) |
 | `PORT`    | `3000`  | HTTP port |
 | `TICK_MS` | `1500`  | One brain round every N ms |
 | `WARMUP`, `DEMO` | on in `npm run demo` only | Pre-run rounds and auto-approval of the first two paper proposals |

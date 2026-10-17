@@ -3,6 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Brain } from './engine/brain.js';
 import { loadOandaFeeds } from './engine/oanda.js';
@@ -72,9 +73,34 @@ const research = RESEARCH === 'live' ? createResearch() : null;
 if (research) console.log(`Research: live sources (${research.kinds.join(', ')}) · analyst: ${research.analyst.label}`);
 const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research });
 
+// State survives restarts (hosts restart idle apps). Kept outside the app folder so redeploys keep
+// it too. The fully simulated demo does not persist unless STATE_FILE is set.
+const STATE_FILE = process.env.STATE_FILE || (SIMULATED ? '' : path.join(os.homedir(), '.os-ai', 'state.json'));
+let restored = false;
+if (STATE_FILE && fs.existsSync(STATE_FILE)) {
+  try {
+    restored = brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')));
+    if (restored) console.log(`State restored from ${STATE_FILE}`);
+  } catch (e) {
+    console.error(`Could not restore ${STATE_FILE}: ${e.message}`);
+  }
+}
+function saveState() {
+  if (!STATE_FILE) return;
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    fs.writeFileSync(`${STATE_FILE}.tmp`, JSON.stringify(brain.save()));
+    fs.renameSync(`${STATE_FILE}.tmp`, STATE_FILE);
+  } catch (e) {
+    console.error(`Could not save state: ${e.message}`);
+  }
+}
+setInterval(saveState, 30000).unref();
+for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => { saveState(); process.exit(0); });
+
 // Warm up so the dashboard opens with history: ticks are spread over the last WARMUP×12s.
 const t0 = Date.now() - WARMUP * 12000;
-for (let i = 0; i < WARMUP; i++) {
+for (let i = 0; i < (restored ? 0 : WARMUP); i++) {
   brain.tick(t0 + i * 12000);
   // Demo mode: approve the first two paper proposals so paper trading has something to show.
   if (DEMO) for (const d of brain.decisions.filter((d) => d.kind === 'paper' && d.status === 'pending').slice(0, 2 - brain.c.paper)) brain.decide(d.id, 'approve');
@@ -154,13 +180,13 @@ const server = http.createServer(async (req, res) => {
     const { action } = await readBody(req);
     if (!['approve', 'reject'].includes(action)) return json(res, 400, { error: 'action must be approve or reject' });
     const ok = brain.decide(m[1], action);
-    if (ok) publish();
+    if (ok) publish(), saveState(); // your decisions are saved at once
     return json(res, ok ? 200 : 409, { ok });
   }
   if (req.method === 'POST' && (m = p.match(/^\/api\/knowledge\/(\w+)\/verdict$/))) {
     const { ok, note } = await readBody(req);
     const done = brain.verdict(m[1], !!ok, String(note || '').slice(0, 500));
-    if (done) publish();
+    if (done) publish(), saveState();
     return json(res, done ? 200 : 404, { ok: done });
   }
   if (req.method === 'POST' && p === '/api/budget') {

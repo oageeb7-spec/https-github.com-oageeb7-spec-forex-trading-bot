@@ -630,6 +630,48 @@ export class Brain {
     }
   }
 
+  // ---------- persistence ----------
+  // Everything that should survive a restart. Market data is not saved; it is reloaded.
+  save() {
+    const qs = this.queues;
+    return {
+      version: 1, savedAt: Date.now(), ids: this.ids, tickNo: this.tickNo, scoutN: this.scoutN,
+      settings: this.settings, c: this.c, sieveFailReasons: this.sieveFailReasons, budget: this.budget,
+      sources: this.sources.slice(-300).map(({ body, ...s }) => s),
+      queues: {
+        toRead: qs.toRead, toWatch: qs.toWatch, toSummarize: qs.toSummarize,
+        toRecipe: qs.toRecipe.map(({ body, ...s }) => s), toLab: qs.toLab.map((s) => s.id),
+      },
+      seenUrls: [...this.seenUrls],
+      strategies: [...this.strategies.values()],
+      variants: this.variants, decisions: this.decisions, log: this.log.slice(-150),
+      terms: this.terms, paper: [...this.paper.entries()], reports: this.reports,
+      knowledge: this.knowledge.map(({ id, step, verdict, note }) => ({ id, step, verdict, note })),
+      agentsDone: Object.fromEntries(Object.values(this.agents).map((a) => [a.id, a.done])),
+    };
+  }
+
+  restore(s) {
+    if (!s || s.version !== 1) return false;
+    Object.assign(this, { ids: s.ids, scoutN: s.scoutN, c: { ...this.c, ...s.c }, sieveFailReasons: s.sieveFailReasons, variants: s.variants, decisions: s.decisions, log: s.log, terms: s.terms, reports: s.reports });
+    this.settings = { ...this.settings, ...s.settings, paused: false };
+    this.budget = { ...this.budget, ...s.budget, limit: this.budget.limit, byAgent: { ...this.budget.byAgent, ...s.budget.byAgent } };
+    this.settings.paused = this.budget.spent >= this.budget.limit;
+    this.sources = s.sources;
+    this.seenUrls = new Set(s.seenUrls);
+    // Strategies on pairs this feed no longer has can't be tested or paper-traded; drop them.
+    this.strategies = new Map(s.strategies.filter((x) => this.symbols.includes(x.symbol)).map((x) => [x.id, x]));
+    this.paper = new Map(s.paper.filter(([id]) => this.strategies.has(id)));
+    this.queues = {
+      toRead: s.queues.toRead, toWatch: s.queues.toWatch, toSummarize: s.queues.toSummarize, toRecipe: s.queues.toRecipe,
+      toLab: s.queues.toLab.map((id) => this.strategies.get(id)).filter(Boolean),
+    };
+    for (const k of s.knowledge) Object.assign(this.knowledge.find((x) => x.id === k.id) || {}, k);
+    for (const [id, n] of Object.entries(s.agentsDone || {})) if (this.agents[id]) this.agents[id].done = n;
+    this.emit('RESTORE', `State restored from ${new Date(s.savedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC · ${this.strategies.size} strategies, ${this.paper.size} on paper, ${this.decisions.filter((d) => d.status === 'pending').length} decisions waiting`, 'director');
+    return true;
+  }
+
   // ---------- views ----------
   snapshot() {
     const strategies = [...this.strategies.values()];

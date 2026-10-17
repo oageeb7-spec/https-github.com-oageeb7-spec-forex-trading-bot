@@ -81,3 +81,25 @@ test('brain pipeline runs, proposes, and paper-trades approved strategies', () =
   assert.ok(p && p.day >= 1);
   assert.ok(brain.strategyDetail(d.strategyId).equity.length > 1);
 });
+
+test('state saved by one brain restores into a fresh one', () => {
+  const a = new Brain();
+  for (let i = 0; i < 120; i++) a.tick(Date.now() + i * 1000);
+  const d = a.decisions.find((x) => x.kind === 'paper' && x.status === 'pending');
+  a.decide(d.id, 'approve');
+  a.verdict('squeeze', false, 'too loose');
+  const saved = JSON.parse(JSON.stringify(a.save()));
+
+  const b = new Brain();
+  assert.ok(b.restore(saved));
+  const s = b.snapshot();
+  assert.equal(s.counts.recipes, a.c.recipes);
+  assert.ok(b.paper.has(d.strategyId));
+  assert.equal(b.strategies.get(d.strategyId).status, 'paper');
+  assert.equal(b.knowledge.find((k) => k.id === 'squeeze').verdict, 'wrong');
+  assert.equal(b.decisions.find((x) => x.id === d.id).status, 'approved');
+  // New ids continue after the restored ones instead of colliding.
+  for (let i = 0; i < 30; i++) b.tick();
+  assert.equal(new Set(b.decisions.map((x) => x.id)).size, b.decisions.length);
+  assert.equal(b.restore({ version: 99 }), false);
+});
