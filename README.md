@@ -40,6 +40,9 @@ The server refuses to start without `OANDA_API_KEY` rather than inventing prices
 Shopify cannot run OS AI itself (it needs a server that stays on), so OS AI runs on a small
 host and your store shows it on a page.
 
+**Hostinger VPS at ostradingai.com:** follow [docs/HOSTINGER.md](docs/HOSTINGER.md); one script
+installs OS AI with HTTPS. Render (below) is the alternative.
+
 1. **Host:** on render.com choose *New → Blueprint* and pick this repository. `render.yaml`
    sets everything up; Render then asks for `OANDA_API_KEY`, `ANTHROPIC_API_KEY` and
    `DASHBOARD_PASSWORD`. Any Node 18+ host works the same way with `npm ci && npm start`.
