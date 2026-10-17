@@ -44,9 +44,9 @@ function chrome(s) {
   const reading = s.agents.some((a) => (a.id === 'reader' || a.id === 'watcher') && a.status === 'working');
   $('#pill-hermes').innerHTML = `<i class="dot ${s.paused ? 'amber' : 'on'}"></i> HERMES <span class="dim">${s.paused ? 'idle' : reading ? 'reading' : 'listening'}</span>`;
   const stale = s.data.symbols.some((x) => x.error);
-  $('#pill-data').innerHTML = s.data.source === 'oanda'
-    ? `<i class="dot ${stale ? 'red' : 'on'}"></i> OANDA <span class="dim">${s.data.env}${stale ? ' · feed error' : ''}</span>`
-    : `<i class="dot amber"></i> DATA <span class="dim">synthetic</span>`;
+  $('#pill-data').innerHTML = s.data.source === 'synthetic'
+    ? `<i class="dot amber"></i> DATA <span class="dim">demo</span>`
+    : `<i class="dot ${stale ? 'red' : 'on'}"></i> OS AI DATA <span class="dim">${stale ? 'feed error' : 'live'}</span>`;
   $('#pill-orion').innerHTML = `<i class="dot ${s.paused ? 'amber' : 'on'}"></i> ORION <span class="dim">${s.paused ? 'paused' : 'running'}</span>`;
   const tick = $('#ticker');
   const items = s.log.slice(-14).reverse();

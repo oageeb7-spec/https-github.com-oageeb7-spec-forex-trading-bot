@@ -7,8 +7,8 @@ OS AI runs as a Node.js web app on the Cloud Startup plan at **https://app.ostra
 `ostradingai.com`/`www` and `shop.ostradingai.com` (Shopify) are separate and unchanged.
 
 - **Keys:** hPanel → Websites → app.ostradingai.com → Node.js → Environment variables:
-  `OANDA_API_KEY` (required), `DASHBOARD_PASSWORD`, optionally `ANTHROPIC_API_KEY`.
-  The app does not start without `OANDA_API_KEY`.
+  `DASHBOARD_PASSWORD` (recommended), optionally `ANTHROPIC_API_KEY`. Prices come from
+  OS AI data with no key; `OANDA_API_KEY` is optional.
 - **Code updates:** run `scripts/publish-hostinger-package.sh`, then in Hostinger pull
   `deploy-src` (Git deploy of branch `hostinger-deploy`) and start a Node.js build from
   `deploy-src/os-ai-app.zip` (Node 22, Express, entry `server/index.js`, build script `build`).
@@ -66,7 +66,7 @@ nano /opt/os-ai/.env
 
 | Key | What to put |
 |-----|-------------|
-| `OANDA_API_KEY` | Your OANDA token: real prices. Required. |
+| `OANDA_API_KEY` | Optional: OANDA's feed instead of OS AI data. |
 | `DASHBOARD_PASSWORD` | A strong password: the site is public, this keeps your trading private. |
 | `ANTHROPIC_API_KEY` | Optional: Claude reads and analyzes research sources. |
 
@@ -77,7 +77,7 @@ systemctl restart os-ai
 ```
 
 Open **https://ostradingai.com**, enter the password (any username), and check the top bar
-says **OANDA practice**. That confirms it runs on real prices, not demo data.
+says **OS AI DATA live**. That confirms it runs on real prices, not demo data.
 
 ## Everyday commands
 

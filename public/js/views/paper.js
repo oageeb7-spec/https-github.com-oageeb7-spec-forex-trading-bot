@@ -22,12 +22,12 @@ export default {
   mount(el, s) {
     root = el;
     el.innerHTML = `<div class="panel" style="margin-bottom:12px"><div class="pb dim">Approved strategies trade on the forward market feed with 1 standard lot for ${s.paper[0]?.days ?? 21} trading days.
-      Profitable ones are proposed for live. ${s.data.source === 'oanda' ? `Prices come from OANDA (${s.data.env}).` : 'Prices are generated (demo mode).'} Live runs on the same feed until a broker adapter is connected — no real orders are sent.</div></div><div class="grid" id="pp" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))"></div>`;
+      Profitable ones are proposed for live. ${s.data.source === 'synthetic' ? 'Prices are generated (demo mode).' : 'Prices are real (OS AI data).'} Live runs on the same feed until a broker adapter is connected — no real orders are sent.</div></div><div class="grid" id="pp" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))"></div>`;
     this.update(s);
   },
   update(s) {
     if (!root) return;
-    $('#pp', root).innerHTML = s.paper.length ? s.paper.slice().reverse().map((p) => card(p, s.data.source === 'oanda' ? `OANDA ${s.data.env} prices` : 'generated prices')).join('') : '<div class="empty">Nothing on paper yet. Approve a validated strategy under Decisions.</div>';
+    $('#pp', root).innerHTML = s.paper.length ? s.paper.slice().reverse().map((p) => card(p, s.data.source === 'synthetic' ? 'generated prices' : 'OS AI data')).join('') : '<div class="empty">Nothing on paper yet. Approve a validated strategy under Decisions.</div>';
   },
   unmount() { root = null; },
 };

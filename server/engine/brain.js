@@ -568,7 +568,7 @@ export class Brain {
     if (d.kind === 'live' && s && d.status === 'approved') {
       s.status = 'live';
       this.c.live++;
-      this.emit('LIVE', `${s.name} switched to live on ${this.data.source === 'oanda' ? 'OANDA prices' : 'generated prices'} · no orders are sent until a broker is connected`, 'director');
+      this.emit('LIVE', `${s.name} switched to live on ${this.data.source === 'synthetic' ? 'generated prices' : 'real OS AI data'} · no orders are sent until a broker is connected`, 'director');
     }
     if (d.kind === 'skill' && d.status === 'approved') {
       this.settings[d.skill] = true;

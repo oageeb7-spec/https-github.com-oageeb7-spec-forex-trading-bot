@@ -16,27 +16,29 @@ robustness sieve, and paper-trades the ones **you** approve.
 
 ```bash
 npm install
-cp .env.example .env   # then put your OANDA (and optionally Anthropic) keys in .env
+cp .env.example .env   # optional: Anthropic key for Claude research, dashboard password
 npm start              # http://localhost:3000
 npm run demo    # fully simulated: generated prices and research, no keys needed
 npm test
 ```
 
-By default everything is real: prices come from OANDA and the agents research real sources.
-The server refuses to start without `OANDA_API_KEY` rather than inventing prices.
+By default everything is real: prices come from **OS AI data** (real hourly FX and gold prices
+from Yahoo Finance's public feed, no key needed) and the agents research real sources. With an
+`OANDA_API_KEY` the feed switches to OANDA, which adds real bid/ask spreads. If no feed can
+load, the server stops rather than inventing prices.
 
 | Env var   | Default | Meaning                                                        |
 |-----------|---------|----------------------------------------------------------------|
-| `OANDA_API_KEY` | — | OANDA v20 API token (required unless `DATA_SOURCE=synthetic`) |
+| `OANDA_API_KEY` | — | Optional OANDA v20 token; switches the price feed to OANDA |
 | `OANDA_ENV` | `practice` | `practice` (demo account) or `live` |
-| `OANDA_POLL_MS` | `30000` | How often to check OANDA for newly closed candles |
+| `POLL_MS` | `30000` | How often to check the feed for newly closed candles |
 | `ANTHROPIC_API_KEY` | — | Lets Claude analyze sources; without it a free keyword classifier is used |
 | `ANALYST_MODEL` | `claude-opus-5-5` | Claude model for the summarizer agents |
 | `ANALYST_EFFORT` | `low` | Claude effort level (`low` … `max`) |
 | `GITHUB_TOKEN` | — | Optional; raises GitHub's search rate limit |
 | `YOUTUBE_API_KEY` | — | Optional; adds YouTube (video titles and descriptions) as a source |
 | `RESEARCH_SCOUT_MS` | `45000` | Pause between the scout's searches |
-| `DATA_SOURCE` | `oanda` | `synthetic` for generated prices |
+| `DATA_SOURCE` | `osai` (`oanda` with a token) | `synthetic` for generated prices |
 | `RESEARCH` | `live` | `simulated` for generated research |
 | `BUDGET`  | `50`    | Thinking budget in USD (real Claude spend in live mode); research pauses at the limit |
 | `DASHBOARD_PASSWORD` | — | Password for the dashboard when hosted publicly |
@@ -82,7 +84,15 @@ With `DASHBOARD_PASSWORD` set, every page and API call needs that password (any 
   Every recipe links back to its source.
 - Failures (rate limits, unreachable sites) mark the agent *stuck* in red and appear in the log.
 
-## Real prices from OANDA
+## OS AI data
+
+Hourly candles for EUR/USD, GBP/USD, AUD/USD, USD/JPY, USD/CAD and gold (COMEX front-month
+future) from Yahoo Finance's public chart endpoint: about two years of history (the last 8,000
+bars are used) and new candles polled every `POLL_MS`. The feed has no bid/ask, so backtests
+charge typical retail spreads. It is unofficial and free, so Yahoo can change or rate-limit it;
+for a contractual feed use OANDA below.
+
+## Optional: prices from OANDA
 
 1. Open a free practice account at oanda.com, then create a token under
    *Manage API Access* (My Account → Tools → API).
