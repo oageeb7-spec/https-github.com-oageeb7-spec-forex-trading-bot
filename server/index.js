@@ -4,16 +4,32 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Brain } from './engine/brain.js';
 import { loadOandaFeeds } from './engine/oanda.js';
+import { createResearch } from './research/index.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const THREE_DIR = path.join(ROOT, '..', 'node_modules', 'three');
 const PORT = Number(process.env.PORT) || 3000;
 const TICK_MS = Number(process.env.TICK_MS) || 1500;
-const WARMUP = Number(process.env.WARMUP ?? 150);
-const DEMO = process.env.DEMO !== '0';
 
 const OANDA_KEY = process.env.OANDA_API_KEY;
-const SOURCE = process.env.DATA_SOURCE || (OANDA_KEY ? 'oanda' : 'synthetic');
+// Real data is the default. Simulation runs only when asked for explicitly.
+const SOURCE = process.env.DATA_SOURCE || 'oanda';
+const RESEARCH = process.env.RESEARCH || 'live';
+const SIMULATED = SOURCE === 'synthetic' && RESEARCH === 'simulated';
+// Warm-up and demo auto-approval only make sense for the fully simulated mode.
+const WARMUP = Number(process.env.WARMUP ?? (SIMULATED ? 150 : 0));
+const DEMO = (process.env.DEMO ?? (SIMULATED ? '1' : '0')) !== '0';
+
+if (SOURCE === 'oanda' && !OANDA_KEY) {
+  console.error('Real market data needs an OANDA API token: OANDA_API_KEY=your-token npm start\n'
+    + 'Get one free from an OANDA practice account (My Account → Manage API Access).\n'
+    + 'To run on generated prices instead: DATA_SOURCE=synthetic npm start');
+  process.exit(1);
+}
+if (!['live', 'simulated'].includes(RESEARCH)) {
+  console.error(`RESEARCH must be "live" or "simulated", got "${RESEARCH}"`);
+  process.exit(1);
+}
 const POLL_MS = Number(process.env.OANDA_POLL_MS) || 30000;
 
 let feeds = null, data = { source: 'synthetic' };
@@ -35,7 +51,9 @@ if (SOURCE === 'oanda') {
   process.exit(1);
 }
 
-const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data });
+const research = RESEARCH === 'live' ? createResearch() : null;
+if (research) console.log(`Research: live sources (${research.kinds.join(', ')}) · analyst: ${research.analyst.label}`);
+const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research });
 
 // Warm up so the dashboard opens with history: ticks are spread over the last WARMUP×12s.
 const t0 = Date.now() - WARMUP * 12000;

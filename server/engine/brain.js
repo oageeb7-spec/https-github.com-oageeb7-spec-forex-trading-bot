@@ -6,12 +6,14 @@ import { Feed, INSTRUMENTS, resample, rng } from './market.js';
 import { TEMPLATES, defaults, mutate, scale } from './strategies.js';
 import { backtest, downsample, round } from './backtest.js';
 import { CONCEPTS, analyzeConcept } from './patterns.js';
+import { HYPE as HYPE_RE } from '../research/analyst.js';
 
 const HIST_BARS = 8000;
 const SPLIT = 0.7;
 const VARIANTS_PER_RECIPE = 10;
 const BARS_PER_PAPER_DAY = 24;
 const PAPER_DAYS = 21;
+const SCOUT_MS = Number(process.env.RESEARCH_SCOUT_MS) || 45000;
 
 const TOPICS = [
   { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx' },
@@ -46,7 +48,8 @@ export const AGENTS = [
 
 export class Brain {
   // `feeds` (symbol → feed with .bars) lets real market data replace the synthetic generator.
-  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' } } = {}) {
+  // `research` (see server/research) switches the agents from simulated sources to real ones.
+  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' }, research = null } = {}) {
     this.r = rng(seed);
     this.started = Date.now();
     this.tickNo = 0;
@@ -54,6 +57,12 @@ export class Brain {
     this.ids = 0;
     this.settings = { earlyCostCheck: false, paused: false };
     this.data = data;
+    this.research = research;
+    this.cost = research ? Object.fromEntries(Object.keys(COST).map((k) => [k, 0])) : COST; // live mode bills real LLM usage only
+    this.seenUrls = new Set();
+    this.scoutN = 0;
+    this.lastScout = 0;
+    this.pendingTerms = [];
 
     if (!feeds) {
       feeds = {};
@@ -117,10 +126,36 @@ export class Brain {
   }
 
   spend(agent, what, mult = 1) {
-    const usd = COST[what] * mult;
+    return this.spendUsd(agent, this.cost[what] * mult);
+  }
+
+  spendUsd(agent, usd) {
     this.budget.spent += usd;
     this.budget.byAgent[agent] += usd;
     return usd;
+  }
+
+  // Runs an async agent task (network or LLM). The agent shows as working until it settles.
+  job(agent, task, fn, onDone) {
+    const a = this.agents[agent];
+    a.busy = true;
+    a.status = 'working';
+    a.task = task;
+    fn()
+      .then((res) => {
+        this.now = Date.now();
+        a.done++;
+        a.status = 'idle';
+        onDone(res);
+      })
+      .catch((e) => {
+        this.now = Date.now();
+        a.status = 'stuck';
+        a.task = `Failed: ${task}`;
+        this.emit('ERROR', `${a.name}: ${e.message}`, agent);
+        onDone(null, e);
+      })
+      .finally(() => (a.busy = false));
   }
 
   work(agent, task, to) {
@@ -136,13 +171,22 @@ export class Brain {
     this.now = now;
     if (++this.tickNo === 1) this.started = now; // warm-up ticks are back-dated
     this.handoffs = [];
-    for (const a of Object.values(this.agents)) if (a.status === 'working') a.status = 'idle';
+    for (const a of Object.values(this.agents)) if (a.status === 'working' && !a.busy) a.status = 'idle';
 
     if (this.budget.spent >= this.budget.limit) {
       if (!this.settings.paused) this.emit('BUDGET', `Thinking budget of $${this.budget.limit} reached — research paused`, 'director');
       this.settings.paused = true;
     }
-    if (!this.settings.paused) {
+    if (!this.settings.paused && this.research) {
+      this.liveScout();
+      this.liveRead('reader', this.queues.toRead);
+      this.liveRead('watcher', this.queues.toWatch);
+      this.liveSummarize();
+      this.liveTerms();
+      this.makeRecipes();
+      this.runLab();
+      this.direct();
+    } else if (!this.settings.paused) {
       this.scout();
       this.read();
       this.watch();
@@ -258,18 +302,105 @@ export class Brain {
     if (k) k.step++;
   }
 
+  // ---------- live research (real sources) ----------
+  liveScout() {
+    const backlog = this.queues.toRead.length + this.queues.toWatch.length + this.queues.toSummarize.length;
+    if (this.agents.scout.busy || backlog >= 12 || this.now - this.lastScout < SCOUT_MS) return;
+    this.lastScout = this.now;
+    const kinds = this.research.kinds, n = this.scoutN++;
+    const kind = kinds[n % kinds.length], tp = TOPICS[Math.floor(n / kinds.length) % TOPICS.length];
+    const where = { youtube: 'YouTube', github: 'GitHub', arxiv: 'arXiv', web: 'Hacker News' }[kind];
+    this.job('scout', `Search ${where}: "${tp.q}"`, () => this.research.search(kind, tp.q), (results) => {
+      if (!results) return;
+      const fresh = results.filter((r) => r.url && !this.seenUrls.has(r.url));
+      this.emit('SEARCH', `Search ${where}: "${tp.q}" · ${results.length} results, ${fresh.length} new`, 'scout');
+      for (const r of fresh) {
+        this.seenUrls.add(r.url);
+        const src = { ...r, id: this.id('s'), topic: tp.topic, t: this.now, status: 'queued', size: r.text.split(/\s+/).length };
+        this.sources.push(src);
+        if (this.sources.length > 500) this.sources.shift();
+        this.c.sources++;
+        this.bump(kind);
+        (kind === 'youtube' ? this.queues.toWatch : this.queues.toRead).push(src);
+      }
+      if (fresh.length) this.handoffs.push({ from: 'scout', to: kind === 'youtube' ? 'watcher' : 'reader', t: this.now });
+    });
+  }
+
+  liveRead(agent, queue) {
+    if (this.agents[agent].busy || !queue.length) return;
+    const src = queue.shift();
+    src.status = 'reading';
+    this.reading = src;
+    this.job(agent, `Reading "${src.title}"`, () => this.research.read(src), (text) => {
+      if (!text) return this.reject(src, agent, 'could not be fetched');
+      src.body = text;
+      src.size = text.split(/\s+/).length;
+      if (HYPE_RE.test(text)) return this.reject(src, agent, 'promises unrealistic returns');
+      src.status = 'read';
+      this.c.read++;
+      const what = { github: 'README', arxiv: 'Abstract', web: 'Article', youtube: 'Video description' }[src.kind];
+      this.emit(agent === 'watcher' ? 'WATCH' : 'READ', `${what} read · ${src.size.toLocaleString('en')} words · "${src.title}"`, agent);
+      this.queues.toSummarize.push(src);
+    });
+  }
+
+  liveSummarize() {
+    for (const id of ['sum1', 'sum2', 'sum3']) {
+      if (this.agents[id].busy || !this.queues.toSummarize.length) continue;
+      const src = this.queues.toSummarize.shift();
+      this.job(id, `Analyzing "${src.title}"`, () => this.research.analyst.analyze(src, src.body, this.symbols), (a) => {
+        delete src.body;
+        if (!a) { src.status = 'rejected'; this.c.sourceRejected++; return; }
+        this.spendUsd(id, a.cost);
+        src.summary = a.summary;
+        for (const term of a.terms || []) this.pendingTerms.push({ term, source: src.title });
+        if (!a.testable) {
+          src.status = 'rejected';
+          this.c.sourceRejected++;
+          this.emit('SUMMARIZE', `"${src.title}" · ${a.reason}${a.cost ? ` · $${a.cost.toFixed(4)}` : ''}`, id);
+          return;
+        }
+        src.status = 'summarized';
+        src.template = a.template;
+        src.analysis = a;
+        this.c.summarized++;
+        this.handoffs.push({ from: id, to: 'recipes', t: this.now });
+        this.emit('SUMMARIZE', `"${src.title}" · ${TEMPLATES[a.template].label}${a.symbols.length ? ` on ${a.symbols.join(', ')}` : ''} · usable${a.cost ? ` · $${a.cost.toFixed(4)}` : ''}`, id);
+        this.queues.toRecipe.push(src);
+      });
+    }
+  }
+
+  liveTerms() {
+    const next = this.pendingTerms.shift();
+    if (!next) return;
+    const term = next.term.trim();
+    if (!term || this.terms.find((t) => t.term.toLowerCase() === term.toLowerCase())) return;
+    this.terms.push({ term, t: this.now, source: next.source });
+    if (this.terms.length > 200) this.terms.shift();
+    this.work('terms', `New term "${term}"`);
+    const known = CONCEPTS.find((c) => c.name.toLowerCase() === term.toLowerCase() || c.aka.toLowerCase().split(/\s*·\s*/).includes(term.toLowerCase()));
+    const k = known && this.knowledge.find((x) => x.id === known.id);
+    if (k && k.step < 5) k.step++;
+    this.emit('TERM', `${known ? 'Known' : 'New'} term: "${term}" · from "${next.source}"`, 'terms');
+  }
+
   makeRecipes() {
     const src = this.queues.toRecipe.shift();
     if (!src) return;
-    const n = 1 + Math.floor(this.r() * 4);
-    for (let i = 0; i < n; i++) {
-      const symbol = this.pick(this.symbols), tf = this.chance(0.6) ? '1h' : '4h';
-      const base = mutate(src.template, defaults(src.template), this.r, 0.25);
+    const an = src.analysis;
+    // Live: test on the pairs the source names (or two others), with the source's own settings.
+    const plan = an
+      ? (an.symbols.length ? an.symbols.slice(0, 3) : this.symbols.slice().sort(() => this.r() - 0.5).slice(0, 2)).map((symbol) => ({ symbol, tf: an.timeframe, params: { ...an.params } }))
+      : Array.from({ length: 1 + Math.floor(this.r() * 4) }, () => ({ symbol: this.pick(this.symbols), tf: this.chance(0.6) ? '1h' : '4h', params: mutate(src.template, defaults(src.template), this.r, 0.25) }));
+    const n = plan.length;
+    for (const { symbol, tf, params: base } of plan) {
       let name = `${TEMPLATES[src.template].label} ${symbol} ${tf}`;
       const same = [...this.strategies.values()].filter((s) => s.baseName === name).length;
       const strat = {
         id: this.id('r'), baseName: name, name: same ? `${name} v${same + 1}` : name,
-        template: src.template, symbol, tf, params: base, source: src.title, sourceKind: src.kind,
+        template: src.template, symbol, tf, params: base, source: src.title, sourceKind: src.kind, sourceUrl: src.url,
         status: 'queued', gates: [null, null, null, null, null], created: this.now,
       };
       this.strategies.set(strat.id, strat);
@@ -535,9 +666,10 @@ export class Brain {
       variants: this.variants,
       ranked: ranked.map(summary),
       sieveFailReasons: this.sieveFailReasons,
-      sources: this.sources.slice(-300).map(({ id, kind, topic, title, status, t, size, progress }) => ({ id, kind, topic, title, status, t, size, progress })),
+      sources: this.sources.slice(-300).map(({ id, kind, topic, title, status, t, size, progress, url, summary }) => ({ id, kind, topic, title, status, t, size, progress, url, summary })),
+      research: this.research ? { mode: 'live', analyst: this.research.analyst.label, kinds: this.research.kinds } : { mode: 'simulated' },
       topics: TOPICS.map((t) => t.topic),
-      reading: this.queues.toWatch[0] || this.sources.filter((s) => s.status === 'read' || s.status === 'summarized').slice(-1)[0] || null,
+      reading: this.research ? (this.reading && { id: this.reading.id, kind: this.reading.kind, topic: this.reading.topic, title: this.reading.title, status: this.reading.status, size: this.reading.size, url: this.reading.url, live: true }) : this.queues.toWatch[0] || this.sources.filter((s) => s.status === 'read' || s.status === 'summarized').slice(-1)[0] || null,
       queues: Object.fromEntries(Object.entries(this.queues).map(([k, v]) => [k, v.length])),
       paper: paperList,
       terms: this.terms,
@@ -565,7 +697,7 @@ export class Brain {
     const m = full.metrics;
     return {
       ...summary(s), params: s.params, paramDefs: TEMPLATES[s.template].params, blurb: TEMPLATES[s.template].blurb,
-      source: s.source, transfer: s.transfer, failReason: s.failReason,
+      source: s.source, sourceUrl: s.sourceUrl, transfer: s.transfer, failReason: s.failReason,
       metrics: { trades: m.trades, winrate: m.winrate, rr: m.rr, expectancy: m.expectancy, expectancyR: m.expectancyR, net: m.net, maxDD: m.maxDD, sharpe: m.sharpe },
       equity: downsample(m.equity, 160), drawdown: downsample(m.drawdown, 160), monthly: m.monthly,
       split: splitIndex(full.trades, bars[Math.floor(bars.length * SPLIT)].t),

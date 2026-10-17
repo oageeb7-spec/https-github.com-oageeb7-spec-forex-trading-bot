@@ -8,8 +8,8 @@ function reading(s) {
   if (!r) return '<div class="empty">Nothing being read right now.</div>';
   const prog = r.kind === 'youtube' && r.progress ? Math.min(1, r.progress / r.size) : 1;
   return `<div class="lbl">${r.kind === 'youtube' ? 'Now watching' : 'Last read'}</div>
-    <h3 style="margin:6px 0;font-weight:500">${esc(r.title)}</h3>
-    <div class="dim" style="font-size:12px">${esc(r.topic)} · ${r.kind === 'youtube' ? `${r.size} min video` : `${num(r.size)} words`}</div>
+    <h3 style="margin:6px 0;font-weight:500">${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)} ↗</a>` : esc(r.title)}</h3>
+    <div class="dim" style="font-size:12px">${esc(r.topic)} · ${r.kind === 'youtube' && !r.live ? `${r.size} min video` : `${num(r.size)} words`}</div>
     <div style="height:4px;background:var(--line-2);margin:10px 0"><i style="display:block;height:100%;width:${prog * 100}%;background:var(--cyan)"></i></div>
     <div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip">${r.kind}</span><span class="chip ${r.status === 'summarized' ? 'green' : 'amber'}">${r.status}</span></div>`;
 }
@@ -20,7 +20,8 @@ function queues(s) {
 }
 
 function list(s) {
-  return s.sources.slice(-40).reverse().map((x) => `<div class="srcrow"><span class="kind">${x.kind}</span><span>${esc(x.title)}<div class="dim" style="font-size:11px">${esc(x.topic)} · ${ago(x.t)}</div></span><span class="st-${x.status} mono" style="font-size:11px;text-align:right">${x.status}</span></div>`).join('');
+  if (!s.sources.length) return `<div class="empty">${s.research.mode === 'live' ? 'The scout runs its first search shortly.' : 'No sources yet.'}</div>`;
+  return s.sources.slice(-40).reverse().map((x) => `<div class="srcrow"><span class="kind">${x.kind}</span><span>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : esc(x.title)}<div class="dim" style="font-size:11px">${esc(x.topic)} · ${ago(x.t)}${x.summary ? ` · ${esc(x.summary)}` : ''}</div></span><span class="st-${x.status} mono" style="font-size:11px;text-align:right">${x.status}</span></div>`).join('');
 }
 
 function terms(s) {
@@ -52,7 +53,7 @@ export default {
     $('#rs-q', root).innerHTML = queues(s);
     $('#rs-terms', root).innerHTML = terms(s);
     $('#rs-list', root).innerHTML = list(s);
-    $('#rs-tot', root).textContent = `${num(s.counts.sources)} found · ${num(s.counts.read)} read · ${num(s.counts.sourceRejected)} rejected`;
+    $('#rs-tot', root).textContent = `${s.research.mode === 'live' ? `live · ${s.research.kinds.join(', ')} · analyst: ${s.research.analyst} · ` : 'simulated · '}${num(s.counts.sources)} found · ${num(s.counts.read)} read · ${num(s.counts.sourceRejected)} rejected`;
   },
   unmount() { galaxy?.stop(); root = null; },
 };

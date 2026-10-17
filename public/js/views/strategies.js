@@ -35,7 +35,7 @@ function detailHtml(d) {
   return `<div class="panel"><div class="pb">
       <div><span class="chip">${d.symbol}</span><span class="chip">${d.tf}</span><span class="chip ${d.status === 'failed-sieve' ? '' : 'green'}">${STATUS[d.status] || d.status}</span></div>
       <h2 style="font-size:24px;font-weight:500;margin:10px 0 4px">${esc(d.name)}</h2>
-      <div class="dim">${esc(d.blurb)} From: “${esc(d.source)}”.</div></div></div>
+      <div class="dim">${esc(d.blurb)} From: ${d.sourceUrl ? `<a href="${esc(d.sourceUrl)}" target="_blank" rel="noopener" class="green">“${esc(d.source)}” ↗</a>` : `“${esc(d.source)}”`}.</div></div></div>
     <div class="panel" style="margin-top:12px"><div class="ph"><span class="t">Key figures</span><span class="s">from the best backtest in the lab, after costs</span></div>
       <div class="pb grid" style="grid-template-columns:repeat(5,1fr)">${figures(d)}</div></div>
     <div class="panel" style="margin-top:12px"><div class="ph"><span class="t">Equity curve</span><span class="s">in dollars, 1 standard lot · the line of the best backtest</span></div>

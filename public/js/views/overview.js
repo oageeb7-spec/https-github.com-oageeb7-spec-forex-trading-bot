@@ -142,7 +142,7 @@ export default {
     const lab = s.agents.find((a) => a.id === 'lab');
     $('#core-now', root).innerHTML = `<b>NOW</b>${esc(lab.task || 'the lab is waiting for recipes')}`;
     const rd = s.reading;
-    $('#core-reading', root).innerHTML = rd ? `<b>READING</b>${esc(rd.title)}${rd.kind === 'youtube' && rd.progress ? ` · min ${Math.min(rd.progress, rd.size)} of ${rd.size}` : ''}` : '';
+    $('#core-reading', root).innerHTML = rd ? `<b>READING</b>${esc(rd.title)}${rd.kind === 'youtube' && !rd.live && rd.progress ? ` · min ${Math.min(rd.progress, rd.size)} of ${rd.size}` : ''}` : '';
     const mx = Math.max(1, ...s.activity);
     $('#core-act', root).innerHTML = s.activity.map((n) => `<i style="height:${(n / mx) * 100}%"></i>`).join('');
     $('#ov-report', root).innerHTML = report(s);

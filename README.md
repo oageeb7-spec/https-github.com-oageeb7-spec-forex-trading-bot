@@ -5,22 +5,48 @@ strategy ideas, turns them into testable recipes, backtests variants, filters th
 robustness sieve, and paper-trades the ones **you** approve.
 
 ```bash
-npm install     # only dependency: three.js for the 3D agent room
-npm start       # http://localhost:3000
+npm install
+OANDA_API_KEY=your-oanda-token ANTHROPIC_API_KEY=your-anthropic-key npm start   # http://localhost:3000
+npm run demo    # fully simulated: generated prices and research, no keys needed
 npm test
 ```
 
+By default everything is real: prices come from OANDA and the agents research real sources.
+The server refuses to start without `OANDA_API_KEY` rather than inventing prices.
+
 | Env var   | Default | Meaning                                                        |
 |-----------|---------|----------------------------------------------------------------|
-| `PORT`    | `3000`  | HTTP port                                                      |
-| `TICK_MS` | `1500`  | One brain round every N ms                                     |
-| `BUDGET`  | `50`    | Thinking budget in USD; research pauses when it is used up     |
-| `WARMUP`  | `150`   | Rounds run at startup so the dashboard opens with history      |
-| `DEMO`    | `1`     | Auto-approve the first two paper proposals during warm-up (`0` to disable) |
-| `OANDA_API_KEY` | — | OANDA v20 API token; when set, real prices replace the synthetic feed |
-| `OANDA_ENV` | `practice` | `practice` (fxTrade Practice / demo account) or `live` |
+| `OANDA_API_KEY` | — | OANDA v20 API token (required unless `DATA_SOURCE=synthetic`) |
+| `OANDA_ENV` | `practice` | `practice` (demo account) or `live` |
 | `OANDA_POLL_MS` | `30000` | How often to check OANDA for newly closed candles |
-| `DATA_SOURCE` | auto | `oanda` or `synthetic`; defaults to `oanda` when a key is set |
+| `ANTHROPIC_API_KEY` | — | Lets Claude analyze sources; without it a free keyword classifier is used |
+| `ANALYST_MODEL` | `claude-opus-5-5` | Claude model for the summarizer agents |
+| `ANALYST_EFFORT` | `low` | Claude effort level (`low` … `max`) |
+| `GITHUB_TOKEN` | — | Optional; raises GitHub's search rate limit |
+| `YOUTUBE_API_KEY` | — | Optional; adds YouTube (video titles and descriptions) as a source |
+| `RESEARCH_SCOUT_MS` | `45000` | Pause between the scout's searches |
+| `DATA_SOURCE` | `oanda` | `synthetic` for generated prices |
+| `RESEARCH` | `live` | `simulated` for generated research |
+| `BUDGET`  | `50`    | Thinking budget in USD (real Claude spend in live mode); research pauses at the limit |
+| `PORT`    | `3000`  | HTTP port |
+| `TICK_MS` | `1500`  | One brain round every N ms |
+| `WARMUP`, `DEMO` | on in `npm run demo` only | Pre-run rounds and auto-approval of the first two paper proposals |
+
+## Live research
+
+- **Scout** searches arXiv, GitHub, Hacker News (web articles) and, with a key, YouTube, rotating
+  through ten FX strategy topics. Already-seen URLs are skipped.
+- **Reader / Watcher** fetch the full text: arXiv abstracts, repository READMEs, article bodies
+  (HTML stripped) and video descriptions. Text beyond 40,000 characters is cut and marked.
+  Sources that promise unrealistic returns ("never lose", "100% win rate") are rejected.
+- **Summarizers** send each document to Claude (`claude-opus-5-5`, structured JSON output,
+  server-side refusal fallback enabled). Claude decides whether the document describes a rule
+  one of the six recipe templates can test, which pairs and timeframe it targets, and which
+  settings it uses. The document is treated as untrusted data. Real token usage is priced and
+  charged to the thinking budget, per agent, on the Costs page.
+- **Recipe maker** tests the source's own settings on the pairs it names (or two others).
+  Every recipe links back to its source.
+- Failures (rate limits, unreachable sites) mark the agent *stuck* in red and appear in the log.
 
 ## Real prices from OANDA
 
@@ -74,14 +100,11 @@ Research galaxy · Strategies (key figures, equity + drawdown, monthly robustnes
 Knowledge base (card-by-card check) · Agent room (3D work floor) · Paper & live · Decisions ·
 Costs · Machines.
 
-## What is simulated
+## What is still not real
 
-- **Market data** is synthetic (regime-switching drift, clustered volatility, session effects)
-  unless `OANDA_API_KEY` is set — see above.
-- **Research** sources and summaries are generated; the agents do not browse the web or call an
-  LLM yet. The pipeline boundaries (`scout`, `read`, `summarize`, `makeRecipes`) are where real
-  search and LLM calls plug in.
-- **Live** trading sends no orders: there is no broker adapter. Live strategies keep running on
-  the market feed (OANDA or synthetic).
+- **Live** trading sends no orders: there is no broker adapter. "Live" strategies keep running
+  on the OANDA price feed.
+- **Video research** reads titles and descriptions only; the YouTube Data API does not provide
+  transcripts.
 
 Nothing here is financial advice.

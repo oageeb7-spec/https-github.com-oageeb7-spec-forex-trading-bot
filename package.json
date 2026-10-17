@@ -10,9 +10,11 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "TICK_MS=800 node --watch server/index.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "demo": "DATA_SOURCE=synthetic RESEARCH=simulated node server/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "three": "^0.160.0"
   }
 }

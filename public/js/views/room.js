@@ -181,8 +181,9 @@ function frame(time) {
     o.tag.style.left = `${((p.x + 1) / 2) * w}px`;
     o.tag.style.top = `${((1 - p.y) / 2) * h}px`;
     o.tag.style.display = p.z < 1 ? '' : 'none';
-    o.tag.className = `tag ${busy ? 'busy' : ''}`;
-    o.tag.innerHTML = `<i style="background:${busy ? a.color : '#444d59'}"></i>${esc(a.name)}${busy ? '<em>working</em>' : ''}`;
+    const stuck = a.status === 'stuck';
+    o.tag.className = `tag ${busy ? 'busy' : stuck ? 'stuck' : ''}`;
+    o.tag.innerHTML = `<i style="background:${busy ? a.color : stuck ? '#f05252' : '#444d59'}"></i>${esc(a.name)}${busy ? '<em>working</em>' : stuck ? '<em style="color:#f05252">stuck</em>' : ''}`;
   }
   packets = packets.filter((p) => {
     p.t += 0.014;
