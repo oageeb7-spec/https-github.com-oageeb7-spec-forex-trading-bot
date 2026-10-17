@@ -1,5 +1,6 @@
 import './env.js';
 import http from 'node:http';
+import net from 'node:net';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -348,6 +349,10 @@ http.createServer(handle).listen(PORT, HOST, () => console.log(`OS AI // TRADING
 function becomePrimary() {
   if (!SOCKET) return;
   try { fs.unlinkSync(SOCKET); } catch { /* none left over */ }
-  http.createServer(handle).listen(SOCKET).on('error', (e) => console.error(`Could not open ${SOCKET}: ${e.message}`));
+  // A plain net server handing its connections to an http server: hosts such as Hostinger's
+  // LiteSpeed runner allow only one http listen() per app and silently ignore a second.
+  const inner = http.createServer(handle);
+  net.createServer((c) => inner.emit('connection', c)).listen(SOCKET, () => console.log('Primary: serving the other copies'))
+    .on('error', (e) => console.error(`Could not open ${SOCKET}: ${e.message}`));
 }
 if (primary) becomePrimary();
