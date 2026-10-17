@@ -4,6 +4,16 @@ An agentic forex research and trading system with a live dashboard. A team of ag
 strategy ideas, turns them into testable recipes, backtests variants, filters them through a
 robustness sieve, and paper-trades the ones **you** approve.
 
+![OS AI overview](docs/screenshots/overview.png)
+
+| | |
+|---|---|
+| ![Lab](docs/screenshots/lab.png) **Lab** — 10 variants per recipe, re-based at the in/out-of-sample split | ![Strategies](docs/screenshots/strategies.png) **Strategies** — key figures, equity, drawdown, the five-check sieve |
+| ![Research](docs/screenshots/research.png) **Research** — one cluster per topic, one star per source | ![Knowledge base](docs/screenshots/knowledge.png) **Knowledge base** — check each concept card by card |
+| ![Agent room](docs/screenshots/room.png) **Agent room** — 3D work floor, every movement is a real task | ![Decisions](docs/screenshots/decisions.png) **Decisions** — nothing goes to paper or live without you |
+
+*Screenshots from `npm run demo` (generated prices and research).*
+
 ```bash
 npm install
 cp .env.example .env   # then put your OANDA (and optionally Anthropic) keys in .env
