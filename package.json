@@ -1,0 +1,18 @@
+{
+  "name": "jarvis-trade-brain",
+  "version": "0.1.0",
+  "description": "Agentic forex research and trading system: agents find sources, write strategy recipes, backtest variants, run a robustness sieve and paper-trade what you approve.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "TICK_MS=800 node --watch server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
