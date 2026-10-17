@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Brain } from './engine/brain.js';
+import { loadOandaFeeds } from './engine/oanda.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const THREE_DIR = path.join(ROOT, '..', 'node_modules', 'three');
@@ -11,7 +12,30 @@ const TICK_MS = Number(process.env.TICK_MS) || 1500;
 const WARMUP = Number(process.env.WARMUP ?? 150);
 const DEMO = process.env.DEMO !== '0';
 
-const brain = new Brain({ budget: Number(process.env.BUDGET) || 50 });
+const OANDA_KEY = process.env.OANDA_API_KEY;
+const SOURCE = process.env.DATA_SOURCE || (OANDA_KEY ? 'oanda' : 'synthetic');
+const POLL_MS = Number(process.env.OANDA_POLL_MS) || 30000;
+
+let feeds = null, data = { source: 'synthetic' };
+if (SOURCE === 'oanda') {
+  const env = process.env.OANDA_ENV || 'practice';
+  console.log(`Loading hourly history from OANDA (${env})…`);
+  try {
+    ({ feeds } = await loadOandaFeeds({ token: OANDA_KEY, env, baseUrl: process.env.OANDA_URL }));
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+  data = { source: 'oanda', env };
+  console.log(`OANDA: loaded ${Object.entries(feeds).map(([s, f]) => `${s} (${f.bars.length} bars)`).join(', ')}`);
+  // Completed hourly candles are appended as they close; paper trading acts on them.
+  setInterval(() => Object.values(feeds).forEach((f) => f.poll()), POLL_MS);
+} else if (SOURCE !== 'synthetic') {
+  console.error(`DATA_SOURCE must be "oanda" or "synthetic", got "${SOURCE}"`);
+  process.exit(1);
+}
+
+const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data });
 
 // Warm up so the dashboard opens with history: ticks are spread over the last WARMUP×12s.
 const t0 = Date.now() - WARMUP * 12000;

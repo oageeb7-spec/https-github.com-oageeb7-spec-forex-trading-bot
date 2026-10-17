@@ -12,7 +12,6 @@ const SPLIT = 0.7;
 const VARIANTS_PER_RECIPE = 10;
 const BARS_PER_PAPER_DAY = 24;
 const PAPER_DAYS = 21;
-const SYMBOLS = Object.keys(INSTRUMENTS);
 
 const TOPICS = [
   { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx' },
@@ -46,21 +45,28 @@ export const AGENTS = [
 ];
 
 export class Brain {
-  constructor({ budget = 50, seed = 7 } = {}) {
+  // `feeds` (symbol → feed with .bars) lets real market data replace the synthetic generator.
+  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' } } = {}) {
     this.r = rng(seed);
     this.started = Date.now();
     this.tickNo = 0;
     this.now = Date.now();
     this.ids = 0;
     this.settings = { earlyCostCheck: false, paused: false };
+    this.data = data;
 
-    this.feeds = {};
+    if (!feeds) {
+      feeds = {};
+      for (const s of Object.keys(INSTRUMENTS)) {
+        feeds[s] = new Feed(s);
+        feeds[s].generate(HIST_BARS);
+      }
+    }
+    this.feeds = feeds;
+    this.symbols = Object.keys(feeds);
     this.hist = {};
-    for (const s of SYMBOLS) {
-      const f = new Feed(s);
-      f.generate(HIST_BARS);
-      this.feeds[s] = f;
-      const h1 = f.bars.slice();
+    for (const s of this.symbols) {
+      const h1 = feeds[s].bars.slice();
       this.hist[s] = { '1h': h1, '4h': resample(h1, 4) };
     }
 
@@ -82,7 +88,7 @@ export class Brain {
     this.reports = [];
     this.knowledge = CONCEPTS.map((k, n) => ({
       id: k.id, step: n < 3 ? 6 : n < 7 ? 5 : 3 + (n % 2), verdict: n < 3 ? 'ok' : null, note: '',
-      stats: analyzeConcept(k, this.hist.EURUSD['1h'], 'EURUSD'),
+      stats: analyzeConcept(k, this.hist[this.symbols[0]]['1h'], this.symbols[0]),
     }));
   }
 
@@ -257,7 +263,7 @@ export class Brain {
     if (!src) return;
     const n = 1 + Math.floor(this.r() * 4);
     for (let i = 0; i < n; i++) {
-      const symbol = this.pick(SYMBOLS), tf = this.chance(0.6) ? '1h' : '4h';
+      const symbol = this.pick(this.symbols), tf = this.chance(0.6) ? '1h' : '4h';
       const base = mutate(src.template, defaults(src.template), this.r, 0.25);
       let name = `${TEMPLATES[src.template].label} ${symbol} ${tf}`;
       const same = [...this.strategies.values()].filter((s) => s.baseName === name).length;
@@ -352,7 +358,7 @@ export class Brain {
     const hi = backtest(bars, s.template, scale(s.template, s.params, 1.2), s.symbol).metrics.sharpe;
     if (!(g[1] = lo > 0.2 && hi > 0.2)) return fail(1, `settings ±20% break it (${lo} / ${hi})`, 'robust');
 
-    const other = this.pick(SYMBOLS.filter((x) => x !== s.symbol));
+    const other = this.pick(this.symbols.filter((x) => x !== s.symbol));
     const tr = backtest(this.hist[other][s.tf], s.template, s.params, other).metrics.sharpe;
     s.transfer = { symbol: other, sharpe: tr };
     if (!(g[2] = tr > 0)) return fail(2, `does not carry over to ${other}`, 'transfer');
@@ -452,7 +458,7 @@ export class Brain {
 
   // ---------- paper trading on the live synthetic feed ----------
   paperStep() {
-    for (const s of SYMBOLS) this.feeds[s].next();
+    for (const s of this.symbols) this.feeds[s].next();
     for (const [id, p] of this.paper) {
       const s = this.strategies.get(id);
       const raw = this.feeds[s.symbol].bars;
@@ -541,6 +547,13 @@ export class Brain {
         return { id: k.id, name: c.name, aka: c.aka, category: c.category, tag: c.tag, step: k.step, verdict: k.verdict, note: k.note, found: k.stats.found, followRate: k.stats.followRate };
       }),
       machines: machineStats(),
+      data: {
+        ...this.data,
+        symbols: this.symbols.map((s) => {
+          const f = this.feeds[s], last = f.bars[f.bars.length - 1];
+          return { symbol: s, bars: this.hist[s]['1h'].length, from: this.hist[s]['1h'][0].t, lastBar: last.t, price: f.price, spread: INSTRUMENTS[s].spread, digits: INSTRUMENTS[s].digits, lastPoll: f.lastPoll ?? null, error: f.error ?? null };
+        }),
+      },
     };
   }
 

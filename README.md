@@ -17,6 +17,32 @@ npm test
 | `BUDGET`  | `50`    | Thinking budget in USD; research pauses when it is used up     |
 | `WARMUP`  | `150`   | Rounds run at startup so the dashboard opens with history      |
 | `DEMO`    | `1`     | Auto-approve the first two paper proposals during warm-up (`0` to disable) |
+| `OANDA_API_KEY` | — | OANDA v20 API token; when set, real prices replace the synthetic feed |
+| `OANDA_ENV` | `practice` | `practice` (fxTrade Practice / demo account) or `live` |
+| `OANDA_POLL_MS` | `30000` | How often to check OANDA for newly closed candles |
+| `DATA_SOURCE` | auto | `oanda` or `synthetic`; defaults to `oanda` when a key is set |
+
+## Real prices from OANDA
+
+1. Open a free practice account at oanda.com, then create a token under
+   *Manage API Access* (My Account → Tools → API).
+2. Start with the token:
+
+   ```bash
+   OANDA_API_KEY=your-token npm start                    # practice account
+   OANDA_API_KEY=your-token OANDA_ENV=live npm start     # fxTrade live account
+   ```
+
+On startup the server pulls the last 8,000 hourly mid candles (~1.5 years) per pair from
+`/v3/instruments/{pair}/candles`, paging past OANDA's 5,000-candle limit. Backtests use
+that history and charge each pair's real median bid/ask spread. Every `OANDA_POLL_MS` it
+appends newly closed candles, and paper trading acts on them, so a paper "day" is a real
+trading day. Pairs your account can't trade (gold is restricted in some regions) are skipped
+with a warning. If fewer than two pairs load, the server exits instead of falling back to fake
+data. *Machines → Market data* shows each pair's history range, last candle, spread and feed
+status. The top bar shows `OANDA practice`, `OANDA live` or `DATA synthetic`.
+
+The integration only reads prices. It never places orders.
 
 ## How it works
 
@@ -50,9 +76,8 @@ Costs · Machines.
 
 ## What is simulated
 
-- **Market data** is synthetic (regime-switching drift, clustered volatility, session effects),
-  deterministic per pair. Swap `Feed` in `server/engine/market.js` for a real data source to
-  backtest real history.
+- **Market data** is synthetic (regime-switching drift, clustered volatility, session effects)
+  unless `OANDA_API_KEY` is set — see above.
 - **Research** sources and summaries are generated; the agents do not browse the web or call an
   LLM yet. The pipeline boundaries (`scout`, `read`, `summarize`, `makeRecipes`) are where real
   search and LLM calls plug in.
