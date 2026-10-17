@@ -108,3 +108,7 @@ Costs · Machines.
   transcripts.
 
 Nothing here is financial advice.
+
+## License
+
+Personal use only — see [LICENSE](LICENSE). No redistribution or resale.
