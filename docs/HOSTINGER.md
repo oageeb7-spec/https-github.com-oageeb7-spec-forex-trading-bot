@@ -1,5 +1,22 @@
 # Run OS AI on Hostinger at ostradingai.com
 
+## Current setup: Cloud hosting at app.ostradingai.com
+
+OS AI runs as a Node.js web app on the Cloud Startup plan at **https://app.ostradingai.com**
+(DNS: `app` CNAME → `srv1172.hstgr.io`; Hostinger lifetime SSL with HTTPS redirect).
+`ostradingai.com`/`www` and `shop.ostradingai.com` (Shopify) are separate and unchanged.
+
+- **Keys:** hPanel → Websites → app.ostradingai.com → Node.js → Environment variables:
+  `OANDA_API_KEY` (required), `DASHBOARD_PASSWORD`, optionally `ANTHROPIC_API_KEY`.
+  The app does not start without `OANDA_API_KEY`.
+- **Code updates:** run `scripts/publish-hostinger-package.sh`, then in Hostinger pull
+  `deploy-src` (Git deploy of branch `hostinger-deploy`) and start a Node.js build from
+  `deploy-src/os-ai-app.zip` (Node 22, Express, entry `server/index.js`, build script `build`).
+- Hostinger's web hosting may pause idle Node.js apps; if the agents stop between visits,
+  use a VPS with the script below instead.
+
+## Alternative: a VPS or your own Ubuntu server
+
 OS AI is a program that runs all the time (agents, backtests, live prices), so it needs a
 **Hostinger VPS**. Regular Hostinger web hosting only serves websites and would stop it.
 
