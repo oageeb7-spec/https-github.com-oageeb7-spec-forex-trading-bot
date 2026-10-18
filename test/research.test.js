@@ -102,7 +102,7 @@ test('brain runs the live pipeline end to end with async research', async () => 
   assert.equal(s.research.mode, 'live');
   assert.equal(s.counts.sources, 2, 'second search must not re-add seen URLs');
   assert.equal(s.sources.find((x) => x.title === 'c/d').status, 'rejected');
-  const strat = [...brain.strategies.values()];
+  const strat = [...brain.strategies.values()].filter((x) => x.sourceKind !== 'lab'); // lab exploration is tested below
   assert.ok(strat.length >= 1 && strat.every((x) => x.template === 'breakout' && x.symbol === 'EURUSD' && x.sourceUrl === 'https://github.com/a/b'));
   assert.equal(s.budget.spent, 0, 'keyword analysis and backtests cost nothing');
 });
@@ -114,4 +114,20 @@ test('a failing source marks the agent stuck and logs the error', async () => {
   await new Promise((r) => setImmediate(r));
   assert.equal(brain.agents.scout.status, 'stuck');
   assert.match(brain.log.at(-1).text, /503/);
+});
+
+test('with research down, sources rest and the lab keeps exploring every market', async () => {
+  process.env.RESEARCH_SCOUT_MS = '1';
+  let calls = 0;
+  const research = { kinds: ['arxiv'], analyst: new KeywordAnalyst(), search: async () => { calls++; throw new Error('down'); }, read: async () => '' };
+  const brain = new Brain({ research });
+  const wait = () => new Promise((r) => setImmediate(r));
+  const t0 = Date.now();
+  for (let i = 0; i < 25; i++) { brain.tick(t0 + i * 61_000); await wait(); } // 25 minutes, inside the 30-minute rest
+  assert.equal(calls, 3, 'a source that failed 3 times rests instead of being hammered');
+  assert.match(brain.log.map((l) => l.text).join('\n'), /resting it for 30 minutes/);
+  const explored = [...brain.strategies.values()].filter((x) => x.sourceKind === 'lab');
+  assert.ok(explored.length >= 10, `expected exploration, got ${explored.length}`);
+  assert.ok(explored.some((x) => /^(DOGE|SHIB|PEPE|BONK|WIF|FLOKI)USD$/.test(x.symbol)), 'meme coins are explored too');
+  assert.ok(brain.c.tested > 0, 'the lab actually tested them');
 });

@@ -15,6 +15,12 @@ const BARS_PER_PAPER_DAY = 24;
 const PAPER_DAYS = 21;
 const SCOUT_MS = Number(process.env.RESEARCH_SCOUT_MS) || 45000;
 const LAB_BACKLOG = 30;
+// A research source that fails 3 times in a row is rested for this long, so one outage (a site
+// down, a rate limit) never stalls the Scout.
+const SOURCE_REST_MS = 30 * 60_000;
+// When no research is waiting, the Lab explores on its own every LAB_EXPLORE_MS: a known template on
+// the market tested least so far. Keeps every market (meme coins included) covered without research.
+const LAB_EXPLORE_MS = Number(process.env.LAB_EXPLORE_MS) || 60_000;
 
 const TOPICS = [
   { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx' },
@@ -69,6 +75,8 @@ export class Brain {
     this.scoutN = 0;
     this.lastScout = 0;
     this.pendingTerms = [];
+    this.sourceFails = {}; // kind -> { n, until }
+    this.lastExplore = 0;
 
     if (!feeds) {
       feeds = {};
@@ -319,11 +327,26 @@ export class Brain {
     const backlog = this.queues.toRead.length + this.queues.toWatch.length + this.queues.toSummarize.length;
     if (this.agents.scout.busy || backlog >= 12 || this.now - this.lastScout < SCOUT_MS) return;
     this.lastScout = this.now;
-    const kinds = this.research.kinds, n = this.scoutN++;
-    const kind = kinds[n % kinds.length], tp = TOPICS[Math.floor(n / kinds.length) % TOPICS.length];
+    const ok = this.research.kinds.filter((k) => !(this.sourceFails[k]?.until > this.now));
+    if (!ok.length) { // every source is resting; the Lab keeps exploring meanwhile
+      Object.assign(this.agents.scout, { status: 'idle', task: 'Sources unreachable · retrying in a few minutes' });
+      return;
+    }
+    const n = this.scoutN++;
+    const kind = ok[n % ok.length], tp = TOPICS[Math.floor(n / this.research.kinds.length) % TOPICS.length];
     const where = { youtube: 'YouTube', github: 'GitHub', arxiv: 'arXiv', web: 'Hacker News' }[kind];
     this.job('scout', `Search ${where}: "${tp.q}"`, () => this.research.search(kind, tp.q), (results) => {
-      if (!results) return;
+      if (!results) {
+        const f = (this.sourceFails[kind] ||= { n: 0, until: 0 });
+        if (++f.n >= 3) {
+          f.until = this.now + SOURCE_REST_MS;
+          f.n = 0;
+          this.emit('SEARCH', `${where} failed 3 times in a row · resting it for 30 minutes`, 'scout');
+        }
+        this.lastScout = this.now - SCOUT_MS + 5000; // try the next source soon instead of waiting
+        return;
+      }
+      delete this.sourceFails[kind];
       const fresh = results.filter((r) => r.url && !this.seenUrls.has(r.url));
       this.emit('SEARCH', `Search ${where}: "${tp.q}" · ${results.length} results, ${fresh.length} new`, 'scout');
       for (const r of fresh) {
@@ -427,7 +450,32 @@ export class Brain {
     this.emit('RECIPE', `${n} recipe${n > 1 ? 's' : ''} from "${src.title}" · ${TEMPLATES[src.template].label}`, 'recipes');
   }
 
+  // Lab exploration: with nothing from research to test, try a known template on the market tested
+  // least so far. Recipes made this way say so in their source.
+  explore() {
+    if (!this.research || this.queues.toLab.length || this.queues.toRecipe.length || this.now - this.lastExplore < LAB_EXPLORE_MS) return;
+    this.lastExplore = this.now;
+    const tested = Object.fromEntries(this.symbols.map((x) => [x, 0]));
+    for (const st of this.strategies.values()) if (st.symbol in tested) tested[st.symbol]++;
+    const symbol = this.symbols.slice().sort((a, b) => tested[a] - tested[b] || this.r() - 0.5)[0];
+    const template = this.pick(Object.keys(TEMPLATES));
+    const tf = this.chance(0.6) ? '1h' : '4h';
+    const name = `${TEMPLATES[template].label} ${symbol} ${tf}`;
+    const same = [...this.strategies.values()].filter((x) => x.baseName === name).length;
+    const strat = {
+      id: this.id('r'), baseName: name, name: same ? `${name} v${same + 1}` : name,
+      template, symbol, tf, params: mutate(template, defaults(template), this.r, 0.3), source: 'Lab exploration (no research needed)', sourceKind: 'lab',
+      status: 'queued', gates: [null, null, null, null, null], created: this.now,
+    };
+    this.strategies.set(strat.id, strat);
+    this.c.recipes++;
+    this.queues.toLab.push(strat);
+    this.work('recipes', `Exploring ${name}`, 'lab');
+    this.emit('RECIPE', `Lab exploration: ${name} (least-tested market)`, 'recipes');
+  }
+
   runLab() {
+    this.explore();
     for (let k = 0; k < 2; k++) {
       const s = this.queues.toLab.shift();
       if (!s) return;
