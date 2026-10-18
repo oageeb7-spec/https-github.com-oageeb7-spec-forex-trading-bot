@@ -11,6 +11,8 @@ const PRICES = { 'claude-opus-5-5': [4e-6, 20e-6], 'claude-sonnet-5-5': [2e-6, 1
 const NAMES = {
   EURUSD: /\b(eur ?usd|euro( dollar)?|fiber)\b/, GBPUSD: /\b(gbp ?usd|pound|sterling|cable)\b/, AUDUSD: /\b(aud ?usd|aussie|australian)\b/,
   USDJPY: /\b(usd ?jpy|yen)\b/, USDCAD: /\b(usd ?cad|loonie|canadian)\b/, XAUUSD: /\b(xau ?usd|gold)\b/, BTCUSD: /\b(btc ?usd|bitcoin|btc)\b/,
+  DOGEUSD: /\b(doge ?usd|doge|dogecoin)\b/, SHIBUSD: /\b(shib ?usd|shib|shiba( inu)?)\b/, PEPEUSD: /\b(pepe ?usd|pepe)\b/,
+  BONKUSD: /\b(bonk ?usd|bonk)\b/, WIFUSD: /\b(wif ?usd|wif|dog ?wif ?hat)\b/, FLOKIUSD: /\b(floki ?usd|floki)\b/,
 };
 
 const money = (x) => `${x < 0 ? 'minus ' : ''}${Math.abs(Math.round(x)).toLocaleString('en')} dollars`;

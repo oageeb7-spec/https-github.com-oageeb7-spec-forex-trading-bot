@@ -44,6 +44,9 @@ export const INSTRUMENTS = {
   FLOKIUSD: { name: 'Floki', start: 0.00015, vol: 0.016, contract: 1e8, spread: 0.00000025, digits: 8, toUsd: () => 1, weekends: true, meme: true },
 };
 
+// OS AI trades meme coins only unless MARKETS (server/index.js) asks for other markets.
+export const MEME_COINS = Object.keys(INSTRUMENTS).filter((k) => INSTRUMENTS[k].meme);
+
 const HOUR = 3600_000;
 
 // Feed: an endless 1h bar generator; `history` is the backtest window, `next()` extends it (paper trading).

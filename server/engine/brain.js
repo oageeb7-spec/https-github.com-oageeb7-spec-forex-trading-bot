@@ -31,21 +31,24 @@ const KEEP_SEEN = 3000; // research links remembered so they are not read twice
 // Research queries rotate through these endings so repeat searches find new material.
 const QUERY_ENDINGS = ['', ' backtest', ' python', ' results', ' 2026'];
 
+// Research topics. `fx` topics only make sense with forex markets loaded, `meme` ones with meme coins.
 const TOPICS = [
-  { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx' },
+  { topic: 'Meme coin momentum (DOGE, SHIB, PEPE)', template: 'momentum', q: 'memecoin trading strategy backtest', meme: true },
+  { topic: 'Meme coin pump breakouts', template: 'breakout', q: 'dogecoin breakout strategy', meme: true },
+  { topic: 'Meme coin volatility squeezes', template: 'squeeze', q: 'crypto volatility squeeze strategy', meme: true },
+  { topic: 'Meme coin trend following', template: 'trend', q: 'shiba inu trend following strategy', meme: true },
+  { topic: 'Fading meme coin pumps', template: 'meanrev', q: 'crypto mean reversion after pump', meme: true },
+  { topic: 'Fair value gaps on crypto', template: 'fvg', q: 'fair value gap crypto backtest', meme: true },
   { topic: 'Trend following with ATR stops', template: 'trend', q: 'trend following atr stop' },
-  { topic: 'London breakout', template: 'breakout', q: 'london breakout strategy' },
   { topic: 'Donchian channel breakouts', template: 'breakout', q: 'donchian breakout backtest' },
-  { topic: 'Range trading EUR/USD', template: 'meanrev', q: 'eurusd range trading' },
-  { topic: 'Bollinger band mean reversion', template: 'meanrev', q: 'bollinger mean reversion fx' },
-  { topic: 'Volatility squeeze before news', template: 'squeeze', q: 'volatility squeeze breakout' },
+  { topic: 'Bollinger band mean reversion', template: 'meanrev', q: 'bollinger mean reversion strategy' },
+  { topic: 'Volatility squeeze breakouts', template: 'squeeze', q: 'volatility squeeze breakout' },
   { topic: 'Fair value gaps (ICT)', template: 'fvg', q: 'fair value gap backtest' },
-  { topic: 'Order blocks and imbalance', template: 'fvg', q: 'order block imbalance strategy' },
-  { topic: 'Moving average crossover systems', template: 'trend', q: 'ema crossover forex' },
   { topic: 'Bitcoin momentum and breakouts', template: 'momentum', q: 'bitcoin trading strategy backtest' },
-  { topic: 'Meme coin momentum (DOGE, SHIB, PEPE)', template: 'momentum', q: 'memecoin trading strategy backtest' },
-  { topic: 'Meme coin pump breakouts', template: 'breakout', q: 'dogecoin breakout strategy' },
-  { topic: 'Meme coin volatility squeezes', template: 'squeeze', q: 'crypto volatility squeeze strategy' },
+  { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx', fx: true },
+  { topic: 'London breakout', template: 'breakout', q: 'london breakout strategy', fx: true },
+  { topic: 'Range trading EUR/USD', template: 'meanrev', q: 'eurusd range trading', fx: true },
+  { topic: 'Moving average crossover systems', template: 'trend', q: 'ema crossover forex', fx: true },
 ];
 const HYPE = ['This strategy wins every time', '100% win rate scalping secret', 'Turn $100 into $10,000 in a week', 'The only indicator you will ever need'];
 const TERMS = ['Judas swing', 'Optimal trade entry', 'Silver bullet', 'Kill zone', 'Balanced price range', 'Breaker block', 'Mitigation block', 'Premium / discount', 'Power of three', 'Inducement'];
@@ -69,7 +72,7 @@ export const AGENTS = [
 export class Brain {
   // `feeds` (symbol → feed with .bars) lets real market data replace the synthetic generator.
   // `research` (see server/research) switches the agents from simulated sources to real ones.
-  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' }, research = null, bridge = null } = {}) {
+  constructor({ budget = 50, seed = 7, feeds = null, data = { source: 'synthetic' }, research = null, bridge = null, markets = Object.keys(INSTRUMENTS) } = {}) {
     this.r = rng(seed);
     this.started = Date.now();
     this.tickNo = 0;
@@ -90,13 +93,15 @@ export class Brain {
 
     if (!feeds) {
       feeds = {};
-      for (const s of Object.keys(INSTRUMENTS)) {
+      for (const s of markets) {
         feeds[s] = new Feed(s);
         feeds[s].generate(HIST_BARS);
       }
     }
     this.feeds = feeds;
     this.symbols = Object.keys(feeds);
+    const hasFx = this.symbols.some((x) => !INSTRUMENTS[x].weekends), hasMeme = this.symbols.some((x) => INSTRUMENTS[x].meme);
+    this.topics = TOPICS.filter((t) => (!t.fx || hasFx) && (!t.meme || hasMeme));
     this.hist = {};
     for (const s of this.symbols) {
       const h1 = feeds[s].bars.slice();
@@ -235,7 +240,7 @@ export class Brain {
   scout() {
     if (!this.chance(0.55)) return;
     const kind = this.pick(KINDS);
-    const tp = this.pick(TOPICS);
+    const tp = this.pick(this.topics);
     const hype = this.chance(0.08);
     const results = 3 + Math.floor(this.r() * 9);
     const fresh = 1 + Math.floor(this.r() * Math.min(3, results));
@@ -345,8 +350,8 @@ export class Brain {
     }
     const n = this.scoutN++;
     const kind = ok[n % ok.length], round = Math.floor(n / this.research.kinds.length);
-    const tp = TOPICS[round % TOPICS.length];
-    const q = tp.q + QUERY_ENDINGS[Math.floor(round / TOPICS.length) % QUERY_ENDINGS.length];
+    const tp = this.topics[round % this.topics.length];
+    const q = tp.q + QUERY_ENDINGS[Math.floor(round / this.topics.length) % QUERY_ENDINGS.length];
     const where = { youtube: 'YouTube', github: 'GitHub', arxiv: 'arXiv', web: 'Hacker News' }[kind];
     this.job('scout', `Search ${where}: "${q}"`, () => this.research.search(kind, q), (results) => {
       if (!results) {
@@ -858,7 +863,7 @@ export class Brain {
       sieveFailReasons: this.sieveFailReasons,
       sources: this.sources.slice(-300).map(({ id, kind, topic, title, status, t, size, progress, url, summary }) => ({ id, kind, topic, title, status, t, size, progress, url, summary })),
       research: this.research ? { mode: 'live', analyst: this.research.analyst.label, kinds: this.research.kinds } : { mode: 'simulated' },
-      topics: TOPICS.map((t) => t.topic),
+      topics: this.topics.map((t) => t.topic),
       reading: this.research ? (this.reading && { id: this.reading.id, kind: this.reading.kind, topic: this.reading.topic, title: this.reading.title, status: this.reading.status, size: this.reading.size, url: this.reading.url, live: true }) : this.queues.toWatch[0] || this.sources.filter((s) => s.status === 'read' || s.status === 'summarized').slice(-1)[0] || null,
       queues: Object.fromEntries(Object.entries(this.queues).map(([k, v]) => [k, v.length])),
       paper: paperList,

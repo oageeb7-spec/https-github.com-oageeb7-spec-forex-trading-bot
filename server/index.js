@@ -11,6 +11,7 @@ import { loadYahooFeeds } from './engine/yahoo.js';
 import { createResearch } from './research/index.js';
 import { Bridge } from './engine/bridge.js';
 import { Assistant } from './engine/assistant.js';
+import { INSTRUMENTS, MEME_COINS } from './engine/market.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const THREE_DIR = path.join(ROOT, '..', 'node_modules', 'three');
@@ -31,12 +32,21 @@ if (!['live', 'simulated'].includes(RESEARCH)) {
   process.exit(1);
 }
 const POLL_MS = Number(process.env.POLL_MS) || 30000;
+// Markets OS AI researches, tests and trades: meme coins by default. MARKETS=all adds forex, gold
+// and bitcoin back; or list symbols, e.g. MARKETS=DOGEUSD,SHIBUSD,BTCUSD.
+const MARKETS = !process.env.MARKETS ? MEME_COINS
+  : process.env.MARKETS === 'all' ? Object.keys(INSTRUMENTS)
+    : process.env.MARKETS.split(',').map((x) => x.trim().toUpperCase()).filter((x) => INSTRUMENTS[x]);
+if (MARKETS.length < 2) {
+  console.error(`MARKETS needs at least 2 known symbols (the sieve tests a second market). Known: ${Object.keys(INSTRUMENTS).join(', ')}`);
+  process.exit(1);
+}
 
 let feeds = null, data = { source: 'synthetic' };
 if (SOURCE === 'osai') {
   console.log('Loading hourly history from OS AI data…');
   try {
-    ({ feeds } = await loadYahooFeeds());
+    ({ feeds } = await loadYahooFeeds({ symbols: MARKETS }));
   } catch (e) {
     console.error(e.message);
     process.exit(1);
@@ -62,7 +72,7 @@ const bridge = new Bridge({
   maxDailyLoss: Number(process.env.MAX_DAILY_LOSS) || 100,
   passwordSet: Boolean(process.env.DASHBOARD_PASSWORD),
 });
-const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research, bridge });
+const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research, bridge, markets: MARKETS });
 const assistant = new Assistant();
 console.log(`Voice assistant: ${assistant.enabled ? 'Claude answers open questions' : 'built-in answers (no Anthropic key)'}`);
 

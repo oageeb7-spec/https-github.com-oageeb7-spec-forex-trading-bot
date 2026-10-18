@@ -139,3 +139,13 @@ test('hourly upkeep: newest candles reach the lab, stale proposals are withdrawn
   assert.ok([...brain.strategies.values()].filter((x) => x.status === 'failed-lab').length <= 200);
   assert.ok(brain.decisions.filter((x) => x.status !== 'pending').length <= 100);
 });
+
+test('meme-coin mode researches and trades only meme coins', async () => {
+  const { MEME_COINS } = await import('../server/engine/market.js');
+  const brain = new Brain({ markets: MEME_COINS });
+  for (let i = 0; i < 150; i++) brain.tick(Date.now() + i * 1000);
+  assert.deepEqual(brain.symbols, MEME_COINS);
+  assert.ok(brain.topics.some((t) => t.meme) && !brain.topics.some((t) => t.fx), 'no forex-only research topics');
+  assert.ok(brain.strategies.size > 0);
+  assert.ok([...brain.strategies.values()].every((s) => MEME_COINS.includes(s.symbol)));
+});

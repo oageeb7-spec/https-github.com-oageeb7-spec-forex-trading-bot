@@ -22,8 +22,9 @@ npm run demo    # fully simulated: generated prices and research, no keys needed
 npm test
 ```
 
-By default everything is real: prices come from **OS AI data** (real hourly forex, gold, bitcoin
-and meme-coin prices from Yahoo Finance's public feed, no key needed) and the agents research real
+OS AI trades **meme coins** by default (Dogecoin, Shiba Inu, Pepe, Bonk, dogwifhat, Floki; set
+`MARKETS` for others). Everything is real: prices come from **OS AI data** (real hourly prices
+from Yahoo Finance's public feed, no key needed) and the agents research real
 sources. If the feed cannot load, the server stops rather than inventing prices.
 
 | Env var   | Default | Meaning                                                        |
@@ -35,6 +36,7 @@ sources. If the feed cannot load, the server stops rather than inventing prices.
 | `GITHUB_TOKEN` | — | Optional; raises GitHub's search rate limit |
 | `YOUTUBE_API_KEY` | — | Optional; adds YouTube (video titles and descriptions) as a source |
 | `RESEARCH_SCOUT_MS` | `45000` | Pause between the scout's searches |
+| `MARKETS` | meme coins | Markets to research and trade: by default DOGE, SHIB, PEPE, BONK, WIF and FLOKI. `all` adds forex, gold and bitcoin; or list symbols, e.g. `DOGEUSD,SHIBUSD,BTCUSD` |
 | `DATA_SOURCE` | `osai` | `synthetic` for generated prices |
 | `RESEARCH` | `live` | `simulated` for generated research |
 | `BUDGET`  | `50`    | Thinking budget in USD (real Claude spend in live mode); research pauses at the limit |
