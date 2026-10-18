@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OS Trading AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+    { "imports": {
+      "three": "/vendor/three/build/three.module.js",
+      "three/addons/": "/vendor/three/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="plus">+</span> OS AI <span class="dim">// TRADING</span></div>
+    <div class="pill" id="pill-orion"><i class="dot on"></i> ORION <span class="dim">running</span></div>
+    <div class="pill" id="pill-hermes"><i class="dot on"></i> HERMES <span class="dim">reading</span></div>
+    <div class="pill" id="pill-data"></div>
+    <div class="pill budget" id="pill-budget"></div>
+    <div class="spacer"></div>
+    <div class="voice"><span id="voice-text"></span><input id="voice-input" class="voice-input" placeholder="Type a command…" aria-label="Type a voice command" hidden><button id="voice-btn" class="voice-btn" title="Voice control: click and speak (say “help”)" aria-label="Voice control">🎙</button></div>
+    <div class="top-stat"><span class="lbl">ROUND</span><b id="top-round">–</b></div>
+    <div class="top-stat"><span class="lbl">DECISIONS</span><b id="top-pending" class="amber">–</b></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+  <div class="ticker"><span class="live"><i class="dot on"></i> LIVE</span><div class="ticker-track"><div id="ticker"></div></div></div>
+  <div class="layout">
+    <nav class="sidebar" id="nav">
+      <div class="nav-group">OVERVIEW</div>
+      <a href="#/overview" data-route="overview"><span class="ico">▦</span> Overview</a>
+      <div class="nav-group">BRAIN</div>
+      <a href="#/lab" data-route="lab"><span class="ico">⚗</span> Lab <i class="dot on"></i></a>
+      <a href="#/research" data-route="research"><span class="ico">⌕</span> Research <i class="dot on"></i></a>
+      <a href="#/strategies" data-route="strategies"><span class="ico">⟋</span> Strategies</a>
+      <a href="#/knowledge" data-route="knowledge"><span class="ico">▤</span> Knowledge base <span class="badge" id="badge-knowledge"></span></a>
+      <a href="#/room" data-route="room"><span class="ico">⚇</span> Agent room</a>
+      <div class="nav-group">MONEY</div>
+      <a href="#/dex" data-route="dex"><span class="ico">◈</span> DEX · Robinhood</a>
+      <a href="#/paper" data-route="paper"><span class="ico">▭</span> Paper &amp; live</a>
+      <a href="#/decisions" data-route="decisions"><span class="ico">✓</span> Decisions <span class="badge" id="badge-decisions"></span></a>
+      <div class="nav-group">SYSTEM</div>
+      <a href="#/costs" data-route="costs"><span class="ico">$</span> Costs</a>
+      <a href="#/machines" data-route="machines"><span class="ico">▣</span> Machines</a>
+      <div class="nav-foot"><div>brain <span id="foot-state">running</span></div><div class="dim">round <span id="foot-round">–</span> · ORION</div></div>
+    </nav>
+    <main id="main"></main>
+  </div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
