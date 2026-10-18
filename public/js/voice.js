@@ -7,7 +7,7 @@ import { $, post } from './ui.js';
 const PAGES = {
   overview: 'overview', home: 'overview', dashboard: 'overview', lab: 'lab', research: 'research',
   strategies: 'strategies', strategy: 'strategies', knowledge: 'knowledge', 'knowledge base': 'knowledge',
-  'agent room': 'room', agents: 'room', room: 'room', paper: 'paper', live: 'paper', trading: 'paper',
+  'agent room': 'room', agents: 'room', room: 'room', dex: 'dex', robinhood: 'dex', 'robinhood chain': 'dex', dexscreener: 'dex', paper: 'paper', live: 'paper', trading: 'paper',
   decisions: 'decisions', costs: 'costs', budget: 'costs', machines: 'machines', data: 'machines',
 };
 

@@ -11,6 +11,7 @@ import { loadYahooFeeds } from './engine/yahoo.js';
 import { createResearch } from './research/index.js';
 import ccxt from 'ccxt';
 import { ExchangeTrader } from './engine/exchange.js';
+import { DexDesk } from './engine/dex.js';
 import { Assistant } from './engine/assistant.js';
 import { INSTRUMENTS, MEME_COINS } from './engine/market.js';
 
@@ -87,6 +88,14 @@ const bridge = new ExchangeTrader({
 console.log(client ? `Live trading: ${bridge.name}, spot, ${bridge.quote} · disarmed until you arm it` : 'Live trading: no exchange connected (paper only)');
 const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research, bridge, markets: MARKETS });
 const assistant = new Assistant();
+// DEX desk: DexScreener scanner + paper trading for on-chain meme coins (Robinhood Chain by default).
+// DEX_CHAIN=off turns it off; it stays off in the generated-price demo unless DEX_CHAIN is set.
+const DEX_CHAIN = process.env.DEX_CHAIN || (SOURCE === 'synthetic' ? 'off' : 'robinhood');
+const dex = DEX_CHAIN === 'off' ? null : new DexDesk({
+  chain: DEX_CHAIN, tradeUsd: Number(process.env.DEX_PAPER_USD) || 100, maxOpen: Number(process.env.DEX_MAX_OPEN) || 5,
+  emit: (kind, text) => brain.emit(kind, text, 'scout'),
+});
+if (dex) console.log(`DEX desk: DexScreener ${DEX_CHAIN} · scanner and paper trading (no real swaps)`);
 console.log(`Voice assistant: ${assistant.enabled ? 'Claude answers open questions' : 'built-in answers (no Anthropic key)'}`);
 
 // State survives restarts (hosts restart idle apps). Kept outside the app folder so redeploys keep
@@ -126,7 +135,7 @@ if (!primary) {
     if (!tryLock()) return;
     clearInterval(retry);
     bridge.active = true;
-    try { brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))); } catch { /* nothing saved yet */ }
+    try { const st = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); brain.restore(st); dex?.restore(st.dex); } catch { /* nothing saved yet */ }
     becomePrimary();
     console.log('This copy took over as primary');
   }, 10000);
@@ -134,7 +143,9 @@ if (!primary) {
 }
 if (STATE_FILE && fs.existsSync(STATE_FILE)) {
   try {
-    restored = brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')));
+    const st = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    restored = brain.restore(st);
+    dex?.restore(st.dex);
     if (restored) console.log(`State restored from ${STATE_FILE}`);
   } catch (e) {
     console.error(`Could not restore ${STATE_FILE}: ${e.message}`);
@@ -144,7 +155,7 @@ function saveState() {
   if (!STATE_FILE || !primary) return;
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-    fs.writeFileSync(`${STATE_FILE}.tmp`, JSON.stringify(brain.save()));
+    fs.writeFileSync(`${STATE_FILE}.tmp`, JSON.stringify({ ...brain.save(), dex: dex?.save() }));
     fs.renameSync(`${STATE_FILE}.tmp`, STATE_FILE);
   } catch (e) {
     console.error(`Could not save state: ${e.message}`);
@@ -166,9 +177,10 @@ for (let i = 0; i < (restored ? 0 : WARMUP); i++) {
 }
 
 const clients = new Set();
-let latest = JSON.stringify(brain.snapshot());
+const snapshot = () => ({ ...brain.snapshot(), dex: dex?.view() ?? null });
+let latest = JSON.stringify(snapshot());
 function publish() {
-  latest = JSON.stringify(brain.snapshot());
+  latest = JSON.stringify(snapshot());
   for (const res of clients) res.write(`data: ${latest}\n\n`);
 }
 setInterval(() => {
@@ -176,6 +188,13 @@ setInterval(() => {
   brain.tick();
   publish();
 }, TICK_MS);
+// DEX desk: new coins every 10 minutes, prices every minute (one request round at a time).
+let dexBusy = false;
+if (dex) setInterval(() => {
+  if (!primary || dexBusy) return;
+  dexBusy = true;
+  dex.tick().catch((e) => console.error(`[dex] ${e.message}`)).finally(() => { dexBusy = false; });
+}, 15000);
 // Live positions: exchange prices, balance, stops and targets checked every 30 seconds.
 setInterval(() => { if (primary && bridge.configured) bridge.watch().then(saveState); }, Number(process.env.WATCH_MS) || 30000);
 
@@ -283,7 +302,7 @@ async function handle(req, res) {
   if (req.method === 'POST' && p === '/api/ask') {
     const { q } = await readBody(req);
     try {
-      const r = await assistant.ask(q, brain.snapshot());
+      const r = await assistant.ask(q, snapshot());
       if (r.cost) brain.spendUsd('director', r.cost);
       if (r.by === 'claude') brain.emit('VOICE', `Asked: "${String(q).slice(0, 80)}"`, 'director');
       return json(res, 200, { answer: r.answer, by: r.by });

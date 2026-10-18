@@ -140,6 +140,14 @@ Click the microphone in the top bar (Chrome, Edge or Safari), or press **V**, an
 
 Voice never arms real trading or approves a live strategy; do those on screen.
 
+## DEX desk: Robinhood Chain on DexScreener
+
+The **DEX · Robinhood** page scans [DexScreener's Robinhood Chain listings](https://dexscreener.com/robinhood)
+every 10 minutes, reads prices every minute, builds 5-minute candles, filters out the obvious traps
+(thin liquidity, brand-new pools, coins nobody is selling, inflated valuations, coins already up 60%
+in an hour) and paper-trades the rest. Paper only: real on-chain swaps need a wallet; see
+[docs/DEX.md](docs/DEX.md).
+
 ## Live trading on a crypto exchange
 
 Strategies you approve to Live buy and sell real coins on your exchange account (Binance, Kraken,

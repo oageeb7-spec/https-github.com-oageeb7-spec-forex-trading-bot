@@ -46,6 +46,14 @@ export function answerLocal(q, s) {
     return `${b.name}: ${bal}. ${b.positions.length} coin position${b.positions.length === 1 ? '' : 's'} held, today ${b.dayPnl >= 0 ? 'up' : 'down'} ${Math.abs(b.dayPnl).toFixed(2)} ${b.quote}. `
       + `Live trading is ${b.armed ? 'armed' : 'disarmed'}${b.killed ? ' and the kill switch is on' : ''}.`;
   }
+  if (/\b(dex|robinhood|dexscreener|on.?chain)\b/.test(t)) {
+    const d = s.dex;
+    if (!d) return 'The DEX desk is off.';
+    const safe = d.pairs.filter((p) => p.safe);
+    const top = safe.slice(0, 3).map((p) => p.symbol).join(', ');
+    return `On ${d.chain} I track ${d.pairs.length} coins; ${safe.length} pass the safety filter${top ? `, led by ${top}` : ''}. `
+      + `Paper trading: ${d.positions.length} open, ${d.stats.trades} closed, net ${d.stats.net >= 0 ? 'up' : 'down'} ${Math.abs(d.stats.net).toFixed(2)} dollars.`;
+  }
   if (/\b(budget|spent|spend|cost)\b/.test(t)) return `${s.budget.spent.toFixed(2)} of ${s.budget.limit} dollars of thinking budget used, about ${s.budget.perHour.toFixed(2)} an hour.`;
   if (/\b(agents?|team|who is working|what are you doing|busy)\b/.test(t)) {
     const busy = s.agents.filter((a) => a.status === 'working');
@@ -65,6 +73,7 @@ export function context(s) {
     sieveFailReasons: s.sieveFailReasons,
     agents: s.agents.map((a) => ({ name: a.name, status: a.status, task: a.task })),
     recentLog: s.log.slice(-15).map((l) => `${l.kind}: ${l.text}`),
+    dex: s.dex && { chain: s.dex.chain, tracked: s.dex.pairs.length, safe: s.dex.pairs.filter((p) => p.safe).slice(0, 10).map(({ symbol, price, liquidity, volume24h, change1h, change24h }) => ({ symbol, price, liquidity, volume24h, change1h, change24h })), paper: s.dex.stats, open: s.dex.positions.map(({ symbol, entry, price }) => ({ symbol, entry, price })) },
     exchange: s.bridge && { name: s.bridge.name, configured: s.bridge.configured, armed: s.bridge.armed, killed: s.bridge.killed, account: s.bridge.account, positions: s.bridge.positions?.length ?? 0, dayPnl: s.bridge.dayPnl },
   });
 }

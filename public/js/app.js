@@ -7,11 +7,12 @@ import strategies from './views/strategies.js';
 import knowledge from './views/knowledge.js';
 import room from './views/room.js';
 import paper from './views/paper.js';
+import dex from './views/dex.js';
 import decisions from './views/decisions.js';
 import costs from './views/costs.js';
 import machines from './views/machines.js';
 
-const VIEWS = { overview, lab, research, strategies, knowledge, room, paper, decisions, costs, machines };
+const VIEWS = { overview, lab, research, strategies, knowledge, room, dex, paper, decisions, costs, machines };
 let state = null;
 let current = null;
 let currentName = '';
