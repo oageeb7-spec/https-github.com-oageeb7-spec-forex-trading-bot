@@ -35,15 +35,15 @@ export function answerLocal(q, s) {
   if (/\b(paper|positions?|open trades?|how are .*trades)\b/.test(t)) {
     if (!s.paper.length) return 'Nothing is paper trading yet. Approve a paper proposal under Decisions.';
     const open = s.paper.filter((p) => p.pos);
-    const live = s.bridge?.positions?.length ? ` On MetaTrader there are ${s.bridge.positions.length} open OS AI positions.` : '';
+    const live = s.bridge?.positions?.length ? ` On ${s.bridge.name} OS AI holds ${s.bridge.positions.length} coin position${s.bridge.positions.length === 1 ? '' : 's'}.` : '';
     return `${s.paper.length} strategies are trading on paper, ${open.length} with an open position. `
       + `Together they are ${money(s.paper.reduce((a, p) => a + p.net, 0))}.${live}`;
   }
-  if (/\b(account|balance|equity|metatrader|mt4|mt5|broker|live trading)\b/.test(t)) {
+  if (/\b(account|balance|equity|exchange|binance|kraken|coinbase|bybit|okx|wallet|live trading)\b/.test(t)) {
     const b = s.bridge;
-    if (!b?.configured) return 'MetaTrader is not set up. Add a BRIDGE_TOKEN on the server and install the OS AI expert advisor.';
-    if (!b.account) return `MetaTrader is set up but the expert advisor has not reported yet. Live trading is ${b.armed ? 'armed' : 'disarmed'}.`;
-    return `Account ${b.account.login} on ${b.account.server}: balance ${b.account.balance} and equity ${b.account.equity} ${b.account.currency}. `
+    if (!b?.configured) return 'No exchange is connected. Add EXCHANGE, EXCHANGE_API_KEY and EXCHANGE_SECRET on the server.';
+    const bal = b.account ? `${b.account.free.toFixed(2)} ${b.quote} free of ${b.account.total.toFixed(2)}` : 'balance not read yet';
+    return `${b.name}: ${bal}. ${b.positions.length} coin position${b.positions.length === 1 ? '' : 's'} held, today ${b.dayPnl >= 0 ? 'up' : 'down'} ${Math.abs(b.dayPnl).toFixed(2)} ${b.quote}. `
       + `Live trading is ${b.armed ? 'armed' : 'disarmed'}${b.killed ? ' and the kill switch is on' : ''}.`;
   }
   if (/\b(budget|spent|spend|cost)\b/.test(t)) return `${s.budget.spent.toFixed(2)} of ${s.budget.limit} dollars of thinking budget used, about ${s.budget.perHour.toFixed(2)} an hour.`;
@@ -65,11 +65,11 @@ export function context(s) {
     sieveFailReasons: s.sieveFailReasons,
     agents: s.agents.map((a) => ({ name: a.name, status: a.status, task: a.task })),
     recentLog: s.log.slice(-15).map((l) => `${l.kind}: ${l.text}`),
-    metatrader: s.bridge && { configured: s.bridge.configured, armed: s.bridge.armed, killed: s.bridge.killed, account: s.bridge.account, positions: s.bridge.positions?.length ?? 0, dayPnl: s.bridge.dayPnl },
+    exchange: s.bridge && { name: s.bridge.name, configured: s.bridge.configured, armed: s.bridge.armed, killed: s.bridge.killed, account: s.bridge.account, positions: s.bridge.positions?.length ?? 0, dayPnl: s.bridge.dayPnl },
   });
 }
 
-const SYSTEM = `You are the voice of OS AI, an agentic forex and crypto research and paper-trading system.
+const SYSTEM = `You are the voice of OS AI, an agentic meme-coin research and trading system.
 Answer the user's question using the JSON state you are given. Your answer is read aloud: reply in one to
 three short, plain sentences, with no markdown, lists or symbols, and numbers written as they are spoken.
 If the state does not contain the answer, say so briefly. You cannot place trades, arm live trading or
@@ -88,7 +88,7 @@ export class Assistant {
     const local = answerLocal(q, state);
     if (local) return { answer: local, by: 'local', cost: 0 };
     if (!this.enabled) {
-      return { answer: 'I can answer questions about prices, the best strategy, paper trades, the MetaTrader account, the budget and the agents. Add an Anthropic key on the server to ask me anything else.', by: 'local', cost: 0 };
+      return { answer: 'I can answer questions about prices, the best strategy, paper trades, the exchange account, the budget and the agents. Add an Anthropic key on the server to ask me anything else.', by: 'local', cost: 0 };
     }
     if (state.budget.spent >= state.budget.limit) return { answer: 'The thinking budget is used up, so I can only answer simple questions about prices, strategies and trades.', by: 'local', cost: 0 };
     const res = await this.client.beta.messages.create({

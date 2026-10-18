@@ -12,7 +12,7 @@ test('live questions are answered from the state without Claude', () => {
   assert.match(answerLocal("what's the bitcoin price?", s), /Bitcoin is at/);
   assert.match(answerLocal('which strategy is best', s), /best is|No strategy/);
   assert.match(answerLocal('how much have we spent', s), /thinking budget used/);
-  assert.match(answerLocal('is metatrader connected', s), /MetaTrader is not set up/);
+  assert.match(answerLocal('is the exchange connected', s), /No exchange is connected/);
   assert.equal(answerLocal('why do breakouts fail in ranges', s), null);
 });
 

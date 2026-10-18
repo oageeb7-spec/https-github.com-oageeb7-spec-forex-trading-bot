@@ -43,7 +43,7 @@ sources. If the feed cannot load, the server stops rather than inventing prices.
 | `DASHBOARD_PASSWORD` | — | Password for the dashboard when hosted publicly |
 | `FRAME_ANCESTORS` | your Shopify domains | Sites allowed to embed the dashboard |
 | `STATE_FILE` | `~/.os-ai/state.json` | Where strategies, paper trades, decisions and research are saved so restarts and redeploys keep them (not used by `npm run demo`) |
-| `BRIDGE_TOKEN` | — | Lets the MetaTrader EA connect; see [docs/METATRADER.md](docs/METATRADER.md) for this and the `LIVE_LOTS`, `MAX_LOTS`, `MAX_OPEN_TRADES`, `MAX_DAILY_LOSS` limits |
+| `EXCHANGE`, `EXCHANGE_API_KEY`, `EXCHANGE_SECRET` | — | Connect a crypto exchange for live trading; see [docs/EXCHANGE.md](docs/EXCHANGE.md) for these and the `TRADE_USD`, `MAX_TRADE_USD`, `MAX_OPEN_TRADES`, `MAX_DAILY_LOSS` limits |
 | `PORT`    | `3000`  | HTTP port |
 | `TICK_MS` | `1500`  | One brain round every N ms |
 | `WARMUP`, `DEMO` | on in `npm run demo` only | Pre-run rounds and auto-approval of the first two paper proposals |
@@ -140,16 +140,19 @@ Click the microphone in the top bar (Chrome, Edge or Safari), or press **V**, an
 
 Voice never arms real trading or approves a live strategy; do those on screen.
 
-## Live trading on MT4 / MT5
+## Live trading on a crypto exchange
 
-Strategies you approve to Live can send real orders to MetaTrader through the OS AI EA in `mt/`,
-with lot caps, a maximum number of open trades, a daily loss limit and a kill switch. Setup and
-limits: [docs/METATRADER.md](docs/METATRADER.md).
+Strategies you approve to Live buy and sell real coins on your exchange account (Binance, Kraken,
+Coinbase, Bybit, OKX and the other exchanges the [ccxt](https://github.com/ccxt/ccxt) library
+supports). Spot only, so buys only: long signals buy, the close sells the same coins.
+Every buy is capped, open trades are limited, stops and targets are checked on the exchange's
+price every 30 seconds, a daily loss limit sells everything and disarms, and there is a kill
+switch. Setup and limits: [docs/EXCHANGE.md](docs/EXCHANGE.md).
 
 ## What is still not real
 
-- **The MetaTrader EAs** have not been compiled or run against a broker yet; test on a demo
-  account first.
+- **Exchange trading** has been tested against a simulated exchange, not a real one yet; start
+  with `EXCHANGE_SANDBOX=1` (the exchange's test network) before using real money.
 - **Video research** reads titles and descriptions only; the YouTube Data API does not provide
   transcripts.
 

@@ -32,16 +32,17 @@ export const INSTRUMENTS = {
   USDJPY: { name: 'USD/JPY', start: 151.2, vol: 0.0012, contract: 100000, spread: 0.012, digits: 3, toUsd: (p) => 1 / p },
   USDCAD: { name: 'USD/CAD', start: 1.36, vol: 0.001, contract: 100000, spread: 0.00012, digits: 5, toUsd: (p) => 1 / p },
   XAUUSD: { name: 'Gold', start: 2350, vol: 0.0022, contract: 100, spread: 0.3, digits: 2, toUsd: () => 1 },
-  // 1 lot = 1 BTC. Trades around the clock, so weekends count.
-  BTCUSD: { name: 'Bitcoin', start: 65000, vol: 0.0065, contract: 1, spread: 15, digits: 2, toUsd: () => 1, weekends: true },
+  // 1 lot = 1 BTC. Trades around the clock, so weekends count. `spot`: bought and sold on a crypto
+  // exchange, so long only (a spot account cannot sell what it does not own).
+  BTCUSD: { name: 'Bitcoin', start: 65000, vol: 0.0065, contract: 1, spread: 15, digits: 2, toUsd: () => 1, weekends: true, spot: true },
   // Meme coins: round the clock, very volatile, wide spreads (about 0.15% of price). A lot is sized
   // to roughly $10-20k of coin so paper results compare with the other markets.
-  DOGEUSD: { name: 'Dogecoin', start: 0.15, vol: 0.011, contract: 100_000, spread: 0.0002, digits: 5, toUsd: () => 1, weekends: true, meme: true },
-  SHIBUSD: { name: 'Shiba Inu', start: 0.000015, vol: 0.012, contract: 1e9, spread: 0.000000025, digits: 9, toUsd: () => 1, weekends: true, meme: true },
-  PEPEUSD: { name: 'Pepe', start: 0.00001, vol: 0.016, contract: 1e9, spread: 0.000000015, digits: 10, toUsd: () => 1, weekends: true, meme: true },
-  BONKUSD: { name: 'Bonk', start: 0.00002, vol: 0.017, contract: 1e9, spread: 0.00000003, digits: 10, toUsd: () => 1, weekends: true, meme: true },
-  WIFUSD: { name: 'dogwifhat', start: 2, vol: 0.018, contract: 10_000, spread: 0.003, digits: 4, toUsd: () => 1, weekends: true, meme: true },
-  FLOKIUSD: { name: 'Floki', start: 0.00015, vol: 0.016, contract: 1e8, spread: 0.00000025, digits: 8, toUsd: () => 1, weekends: true, meme: true },
+  DOGEUSD: { name: 'Dogecoin', start: 0.15, vol: 0.011, contract: 100_000, spread: 0.0002, digits: 5, toUsd: () => 1, weekends: true, meme: true, spot: true },
+  SHIBUSD: { name: 'Shiba Inu', start: 0.000015, vol: 0.012, contract: 1e9, spread: 0.000000025, digits: 9, toUsd: () => 1, weekends: true, meme: true, spot: true },
+  PEPEUSD: { name: 'Pepe', start: 0.00001, vol: 0.016, contract: 1e9, spread: 0.000000015, digits: 10, toUsd: () => 1, weekends: true, meme: true, spot: true },
+  BONKUSD: { name: 'Bonk', start: 0.00002, vol: 0.017, contract: 1e9, spread: 0.00000003, digits: 10, toUsd: () => 1, weekends: true, meme: true, spot: true },
+  WIFUSD: { name: 'dogwifhat', start: 2, vol: 0.018, contract: 10_000, spread: 0.003, digits: 4, toUsd: () => 1, weekends: true, meme: true, spot: true },
+  FLOKIUSD: { name: 'Floki', start: 0.00015, vol: 0.016, contract: 1e8, spread: 0.00000025, digits: 8, toUsd: () => 1, weekends: true, meme: true, spot: true },
 };
 
 // OS AI trades meme coins only unless MARKETS (server/index.js) asks for other markets.

@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { Brain } from './engine/brain.js';
 import { loadYahooFeeds } from './engine/yahoo.js';
 import { createResearch } from './research/index.js';
-import { Bridge } from './engine/bridge.js';
+import ccxt from 'ccxt';
+import { ExchangeTrader } from './engine/exchange.js';
 import { Assistant } from './engine/assistant.js';
 import { INSTRUMENTS, MEME_COINS } from './engine/market.js';
 
@@ -62,16 +63,28 @@ if (SOURCE === 'osai') {
 
 const research = RESEARCH === 'live' ? createResearch() : null;
 if (research) console.log(`Research: live sources (${research.kinds.join(', ')}) · analyst: ${research.analyst.label}`);
-// MetaTrader bridge (real orders). Inactive without BRIDGE_TOKEN; never armed at start.
-const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN || '';
-const bridge = new Bridge({
-  token: BRIDGE_TOKEN,
-  lots: Number(process.env.LIVE_LOTS) || 0.01,
-  maxLots: Number(process.env.MAX_LOTS) || 0.1,
+// Crypto exchange for live strategies (real orders). Inactive without exchange keys; never armed at
+// start. Keys belong in the host's environment variables, never in code or chat.
+const EXCHANGE = (process.env.EXCHANGE || '').toLowerCase();
+let client = null;
+if (EXCHANGE && !ccxt.exchanges.includes(EXCHANGE)) console.error(`EXCHANGE "${EXCHANGE}" is not supported; use one of: binance, kraken, coinbase, bybit, okx, …`);
+else if (EXCHANGE && process.env.EXCHANGE_API_KEY && process.env.EXCHANGE_SECRET) {
+  client = new ccxt[EXCHANGE]({
+    apiKey: process.env.EXCHANGE_API_KEY, secret: process.env.EXCHANGE_SECRET,
+    password: process.env.EXCHANGE_PASSPHRASE || undefined, enableRateLimit: true, options: { defaultType: 'spot' },
+  });
+  if (process.env.EXCHANGE_SANDBOX === '1') client.setSandboxMode(true);
+}
+const bridge = new ExchangeTrader({
+  client, name: client ? `${client.name}${process.env.EXCHANGE_SANDBOX === '1' ? ' (test network)' : ''}` : '',
+  quote: process.env.EXCHANGE_QUOTE || 'USDT',
+  tradeUsd: Number(process.env.TRADE_USD) || 20,
+  maxTradeUsd: Number(process.env.MAX_TRADE_USD) || 100,
   maxOpen: Number(process.env.MAX_OPEN_TRADES) || 3,
-  maxDailyLoss: Number(process.env.MAX_DAILY_LOSS) || 100,
+  maxDailyLoss: Number(process.env.MAX_DAILY_LOSS) || 50,
   passwordSet: Boolean(process.env.DASHBOARD_PASSWORD),
 });
+console.log(client ? `Live trading: ${bridge.name}, spot, ${bridge.quote} · disarmed until you arm it` : 'Live trading: no exchange connected (paper only)');
 const brain = new Brain({ budget: Number(process.env.BUDGET) || 50, feeds, data, research, bridge, markets: MARKETS });
 const assistant = new Assistant();
 console.log(`Voice assistant: ${assistant.enabled ? 'Claude answers open questions' : 'built-in answers (no Anthropic key)'}`);
@@ -82,7 +95,7 @@ const STATE_FILE = process.env.STATE_FILE || (SIMULATED ? '' : path.join(os.home
 let restored = false;
 
 // Some hosts run several copies of the app. Only the copy holding this lock runs the agents, saves
-// state and talks to MetaTrader. The others stay on standby and forward every API call to it over a
+// state and trades on the exchange. The others stay on standby and forward every API call to it over a
 // local socket, so all visitors see one brain and real orders can never be duplicated.
 const LOCK_FILE = STATE_FILE ? `${STATE_FILE}.lock` : '';
 // Socket paths are limited to about 100 characters; a long state path gets a short one in the temp folder.
@@ -107,12 +120,12 @@ function tryLock() {
 }
 tryLock();
 if (!primary) {
-  bridge.token = '';
-  console.log('Standby copy: another copy holds the lock and runs the MetaTrader bridge');
+  bridge.active = false;
+  console.log('Standby copy: another copy holds the lock and trades on the exchange');
   const retry = setInterval(() => {
     if (!tryLock()) return;
     clearInterval(retry);
-    bridge.token = BRIDGE_TOKEN;
+    bridge.active = true;
     try { brain.restore(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))); } catch { /* nothing saved yet */ }
     becomePrimary();
     console.log('This copy took over as primary');
@@ -163,30 +176,14 @@ setInterval(() => {
   brain.tick();
   publish();
 }, TICK_MS);
+// Live positions: exchange prices, balance, stops and targets checked every 30 seconds.
+setInterval(() => { if (primary && bridge.configured) bridge.watch().then(saveState); }, Number(process.env.WATCH_MS) || 30000);
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
 function json(res, code, body) {
   res.writeHead(code, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body));
-}
-
-function text(res, code, body) {
-  res.writeHead(code, { 'content-type': 'text/plain; charset=utf-8' });
-  res.end(body);
-}
-
-function readText(req) {
-  return new Promise((resolve) => {
-    let data = '';
-    req.on('data', (c) => { if (data.length < 200_000) data += c; });
-    req.on('end', () => resolve(data));
-  });
-}
-
-function sameSecret(a, b) {
-  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
-  return x.length === y.length && y.length > 0 && crypto.timingSafeEqual(x, y);
 }
 
 function readBody(req) {
@@ -233,15 +230,6 @@ async function handle(req, res) {
   if (p === '/healthz') return json(res, 200, { ok: true, primary });
   if (!primary && SOCKET && p.startsWith('/api/')) return forward(req, res);
 
-  // The MetaTrader EA authenticates with its own token instead of the dashboard password.
-  if (p === '/api/bridge/orders' || p === '/api/bridge/report') {
-    if (!bridge.configured) return text(res, 503, primary ? 'bridge not configured' : 'standby copy, retry');
-    if (!sameSecret(req.headers['x-osai-token'] || '', bridge.token)) return text(res, 401, 'bad token');
-    if (p === '/api/bridge/orders') return text(res, 200, bridge.pending(Number(url.searchParams.get('after')) || 0));
-    const out = bridge.report(await readText(req));
-    publish(), saveState();
-    return text(res, 200, out);
-  }
   if (!authorized(req)) {
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="OS AI", charset="UTF-8"' });
     return res.end('Password required');
@@ -276,19 +264,19 @@ async function handle(req, res) {
     if (done) publish(), saveState();
     return json(res, done ? 200 : 404, { ok: done });
   }
-  if (req.method === 'POST' && p === '/api/bridge/arm') {
+  if (req.method === 'POST' && p === '/api/live/arm') {
     if (!primary) return json(res, 503, { error: 'This copy is on standby; try again.' });
     const { armed } = await readBody(req);
     const err = bridge.arm(Boolean(armed));
     if (err) return json(res, 409, { error: err });
-    brain.emit('LIVE', armed ? 'You armed live trading on MetaTrader' : 'You disarmed live trading', 'director');
+    brain.emit('LIVE', armed ? `You armed live trading on ${bridge.name}` : 'You disarmed live trading', 'director');
     publish(), saveState();
     return json(res, 200, { ok: true });
   }
-  if (req.method === 'POST' && p === '/api/bridge/kill') {
+  if (req.method === 'POST' && p === '/api/live/kill') {
     if (!primary) return json(res, 503, { error: 'This copy is on standby; try again.' });
     bridge.kill();
-    brain.emit('LIVE', 'KILL SWITCH: live trading stopped, closing all OS AI positions', 'director');
+    brain.emit('LIVE', 'KILL SWITCH: live trading stopped, selling all OS AI positions', 'director');
     publish(), saveState();
     return json(res, 200, { ok: true });
   }

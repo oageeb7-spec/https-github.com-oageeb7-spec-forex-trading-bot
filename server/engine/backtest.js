@@ -11,6 +11,7 @@ export function backtest(bars, template, params, symbol, { costMult = 1, from = 
   let busyUntil = -1;
   for (const s of signals) {
     if (s.i < from || s.i >= to - 1 || s.i <= busyUntil) continue;
+    if (inst.spot && s.dir < 0) continue; // spot crypto: long only, as it trades on the exchange
     const entry = s.entry ?? bars[s.i].c;
     const risk = Math.abs(entry - s.stop);
     if (!(risk > 0)) continue;

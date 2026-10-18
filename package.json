@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
+    "ccxt": "^4.5.88",
     "three": "^0.160.0"
   },
   "license": "SEE LICENSE IN LICENSE"

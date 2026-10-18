@@ -69,7 +69,7 @@ function show(text, heard) {
 function status(s) {
   const c = s.counts, b = s.bridge;
   const waiting = s.decisions.filter((d) => d.status === 'pending').length;
-  const live = !b?.configured ? 'MetaTrader is not connected' : b.armed ? 'live trading is armed' : 'live trading is disarmed';
+  const live = !b?.configured ? 'no exchange is connected' : b.armed ? `live trading on ${b.name} is armed` : 'live trading is disarmed';
   return `${c.recipes} recipes tested ${c.tested} times, ${c.validated} validated, ${c.onPaper} on paper. `
     + `${waiting} decision${waiting === 1 ? '' : 's'} waiting for you. ${live}. `
     + `Thinking budget used: ${s.budget.spent.toFixed(2)} of ${s.budget.limit} dollars.`;
@@ -124,13 +124,13 @@ export async function handle(raw) {
   }
 
   if (/\b(kill switch|stop (all )?trading|close everything)\b/.test(t)) {
-    if (!state.bridge?.configured) return say('MetaTrader is not connected, so there is nothing to stop.');
+    if (!state.bridge?.configured) return say('No exchange is connected, so there is nothing to stop.');
     pending = { run: async () => {
-      if (!(await post('/api/bridge/kill', {}))) return say('The kill switch did not go through. Press it on the Paper and live page now.');
+      if (!(await post('/api/live/kill', {}))) return say('The kill switch did not go through. Press it on the Paper and live page now.');
       window.dispatchEvent(new Event('brain:refresh'));
-      say('Kill switch on. Trading stopped and all OS AI positions are being closed.');
+      say('Kill switch on. Trading stopped and every coin OS AI bought is being sold.');
     } };
-    return say('Stop all live trading and close every OS AI position? Say yes to confirm.');
+    return say('Stop all live trading and sell every coin OS AI bought? Say yes to confirm.');
   }
   if (/\barm\b/.test(t)) return say('For safety, arm live trading on screen, on the Paper and live page.');
 

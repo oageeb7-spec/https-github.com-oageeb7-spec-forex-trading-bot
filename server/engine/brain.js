@@ -81,7 +81,7 @@ export class Brain {
     this.settings = { earlyCostCheck: false, paused: false };
     this.data = data;
     this.research = research;
-    this.bridge = bridge; // MetaTrader bridge for live strategies (server/engine/bridge.js)
+    this.bridge = bridge; // exchange trader for live strategies (server/engine/exchange.js)
     this.cost = research ? Object.fromEntries(Object.keys(COST).map((k) => [k, 0])) : COST; // live mode bills real LLM usage only
     this.seenUrls = new Set();
     this.scoutN = 0;
@@ -709,7 +709,7 @@ export class Brain {
     if (d.kind === 'live' && s && d.status === 'approved') {
       s.status = 'live';
       this.c.live++;
-      this.emit('LIVE', `${s.name} switched to live on ${this.data.source === 'synthetic' ? 'generated prices' : 'real OS AI data'} · no orders are sent until a broker is connected`, 'director');
+      this.emit('LIVE', `${s.name} switched to live on ${this.data.source === 'synthetic' ? 'generated prices' : 'real OS AI data'} · no orders are sent until an exchange is connected and armed`, 'director');
     }
     if (d.kind === 'skill' && d.status === 'approved') {
       this.settings[d.skill] = true;
@@ -756,7 +756,7 @@ export class Brain {
           if (s.status === 'live' && this.bridge?.configured) this.liveOrder(s, this.bridge.close(s), 'close');
         }
       } else {
-        const sig = TEMPLATES[s.template].signals(bars, s.params).filter((x) => x.i === bars.length - 1)[0];
+        const sig = TEMPLATES[s.template].signals(bars, s.params).filter((x) => x.i === bars.length - 1 && !(inst.spot && x.dir < 0))[0];
         if (sig) {
           // Limit entries (fair value gap) fill at their limit price inside the bar.
           const entry = sig.entry ?? last.c;
@@ -776,9 +776,10 @@ export class Brain {
   }
 
   liveOrder(s, r, what) {
-    if (r.order) this.emit('ORDER', `${what === 'open' ? `${r.order.dir.toUpperCase()} ${r.order.lots} lot` : 'Close'} ${s.symbol} sent to MetaTrader for ${s.name} (order ${r.order.seq})`, 'director');
+    if (r.order) this.emit('ORDER', `${r.text} for ${s.name} (order ${r.order.seq})`, 'director');
     else this.emit('ORDER', `${s.name}: no real ${what} order (${r.blocked})`, 'director');
   }
+
 
   // ---------- persistence ----------
   // Everything that should survive a restart. Market data is not saved; it is reloaded.
