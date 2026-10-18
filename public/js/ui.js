@@ -27,7 +27,7 @@ export function gates(g) {
 }
 
 export const STATUS = {
-  queued: 'queued', 'failed-lab': 'dropped in lab', 'failed-sieve': 'failed the sieve', validated: 'vault reached',
+  queued: 'queued', 'failed-lab': 'dropped in lab', 'failed-sieve': 'failed the sieve', expired: 'withdrawn on newer prices', validated: 'vault reached',
   paper: 'on paper', live: 'live', rejected: 'rejected by you',
 };
 

@@ -7,7 +7,6 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Brain } from './engine/brain.js';
-import { loadOandaFeeds } from './engine/oanda.js';
 import { loadYahooFeeds } from './engine/yahoo.js';
 import { createResearch } from './research/index.js';
 import { Bridge } from './engine/bridge.js';
@@ -19,44 +18,22 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const TICK_MS = Number(process.env.TICK_MS) || 1500;
 
-const OANDA_KEY = process.env.OANDA_API_KEY;
-// Real data is the default: OS AI data (no key needed), or OANDA when a token is configured.
-// Simulation runs only when asked for explicitly.
-const SOURCE = process.env.DATA_SOURCE || (OANDA_KEY ? 'oanda' : 'osai');
+// Real data is the default: OS AI data (no key needed). Simulation runs only when asked for explicitly.
+const SOURCE = process.env.DATA_SOURCE || 'osai';
 const RESEARCH = process.env.RESEARCH || 'live';
 const SIMULATED = SOURCE === 'synthetic' && RESEARCH === 'simulated';
 // Warm-up and demo auto-approval only make sense for the fully simulated mode.
 const WARMUP = Number(process.env.WARMUP ?? (SIMULATED ? 150 : 0));
 const DEMO = (process.env.DEMO ?? (SIMULATED ? '1' : '0')) !== '0';
 
-if (SOURCE === 'oanda' && !OANDA_KEY) {
-  console.error('Real market data needs an OANDA API token. Copy .env.example to .env and set OANDA_API_KEY,\n'
-    + 'or run: OANDA_API_KEY=your-token npm start\n'
-    + 'Get one free from an OANDA practice account (My Account → Manage API Access).\n'
-    + 'To run on generated prices instead: DATA_SOURCE=synthetic npm start');
-  process.exit(1);
-}
 if (!['live', 'simulated'].includes(RESEARCH)) {
   console.error(`RESEARCH must be "live" or "simulated", got "${RESEARCH}"`);
   process.exit(1);
 }
-const POLL_MS = Number(process.env.POLL_MS || process.env.OANDA_POLL_MS) || 30000;
+const POLL_MS = Number(process.env.POLL_MS) || 30000;
 
 let feeds = null, data = { source: 'synthetic' };
-if (SOURCE === 'oanda') {
-  const env = process.env.OANDA_ENV || 'practice';
-  console.log(`Loading hourly history from OANDA (${env})…`);
-  try {
-    ({ feeds } = await loadOandaFeeds({ token: OANDA_KEY, env, baseUrl: process.env.OANDA_URL }));
-  } catch (e) {
-    console.error(e.message);
-    process.exit(1);
-  }
-  data = { source: 'oanda', env };
-  console.log(`OANDA: loaded ${Object.entries(feeds).map(([s, f]) => `${s} (${f.bars.length} bars)`).join(', ')}`);
-  // Completed hourly candles are appended as they close; paper trading acts on them.
-  setInterval(() => Object.values(feeds).forEach((f) => f.poll()), POLL_MS);
-} else if (SOURCE === 'osai') {
+if (SOURCE === 'osai') {
   console.log('Loading hourly history from OS AI data…');
   try {
     ({ feeds } = await loadYahooFeeds());
@@ -66,9 +43,10 @@ if (SOURCE === 'oanda') {
   }
   data = { source: 'osai', env: 'live' };
   console.log(`OS AI data: loaded ${Object.entries(feeds).map(([s, f]) => `${s} (${f.bars.length} bars)`).join(', ')}`);
+  // Completed hourly candles are appended as they close; paper trading acts on them.
   setInterval(() => Object.values(feeds).forEach((f) => f.poll()), POLL_MS);
 } else if (SOURCE !== 'synthetic') {
-  console.error(`DATA_SOURCE must be "osai", "oanda" or "synthetic", got "${SOURCE}"`);
+  console.error(`DATA_SOURCE must be "osai" or "synthetic", got "${SOURCE}"`);
   process.exit(1);
 }
 

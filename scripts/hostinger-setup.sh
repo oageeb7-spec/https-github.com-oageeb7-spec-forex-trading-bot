@@ -93,7 +93,7 @@ if [ "$FIRST_RUN" -eq 1 ]; then
 OS AI is installed but not started yet: it needs your keys.
 
   1. nano $APP_DIR/.env
-     Fill in OANDA_API_KEY, DASHBOARD_PASSWORD and (optionally) ANTHROPIC_API_KEY. Save with Ctrl+O, Enter, Ctrl+X.
+     Fill in DASHBOARD_PASSWORD, BRIDGE_TOKEN and (optionally) ANTHROPIC_API_KEY. Save with Ctrl+O, Enter, Ctrl+X.
   2. systemctl restart os-ai
   3. Open https://$DOMAIN (the first visit can take a minute while the HTTPS certificate is issued).
 

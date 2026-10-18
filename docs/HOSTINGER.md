@@ -8,7 +8,7 @@ OS AI runs as a Node.js web app on the Cloud Startup plan at **https://app.ostra
 
 - **Keys:** hPanel → Websites → app.ostradingai.com → Node.js → Environment variables:
   `DASHBOARD_PASSWORD` (recommended), optionally `ANTHROPIC_API_KEY`. Prices come from
-  OS AI data with no key; `OANDA_API_KEY` is optional.
+  OS AI data with no key.
 - **Code updates:** run `scripts/publish-hostinger-package.sh`, then in Hostinger pull
   `deploy-src` (Git deploy of branch `hostinger-deploy`) and start a Node.js build from
   `deploy-src/os-ai-app.zip` (Node 22, Express, entry `server/start.cjs`, build script `build`).
@@ -66,7 +66,6 @@ nano /opt/os-ai/.env
 
 | Key | What to put |
 |-----|-------------|
-| `OANDA_API_KEY` | Optional: OANDA's feed instead of OS AI data. |
 | `DASHBOARD_PASSWORD` | A strong password: the site is public, this keeps your trading private. |
 | `ANTHROPIC_API_KEY` | Optional: Claude reads and analyzes research sources. |
 

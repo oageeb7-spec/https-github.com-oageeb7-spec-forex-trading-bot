@@ -116,3 +116,26 @@ test('bitcoin trades through weekends; forex does not', () => {
   const sig = TEMPLATES.trend.signals(btc, { fast: 10, slow: 40, stopAtr: 2, rr: 2 });
   assert.ok(Array.isArray(sig));
 });
+
+test('hourly upkeep: newest candles reach the lab, stale proposals are withdrawn, old data is dropped', () => {
+  const brain = new Brain({});
+  for (let i = 0; i < 150; i++) brain.tick(Date.now() + i * 1000);
+  const sym = brain.symbols[0];
+  const before = brain.hist[sym]['1h'].at(-1).t;
+  for (let i = 0; i < 6; i++) brain.feeds[sym].next(); // new closed candles arrive on the feed
+  // a waiting proposal whose strategy no longer works on the latest prices
+  const d = brain.decisions.find((x) => x.status === 'pending' && x.kind === 'paper');
+  assert.ok(d, 'expected a paper proposal');
+  const s = brain.strategies.get(d.strategyId);
+  s.checkedAt = 0;
+  s.template = 'trend'; s.params = { fast: 30, slow: 30, stopAtr: 2, rr: 2 }; // equal averages never cross: no trades now
+  // plenty of old failed recipes and decided decisions
+  for (let i = 0; i < 400; i++) brain.strategies.set(`old${i}`, { id: `old${i}`, status: 'failed-lab', created: i, symbol: sym });
+  for (let i = 0; i < 300; i++) brain.decisions.unshift({ id: `od${i}`, status: 'rejected', kind: 'paper', title: 'old' });
+  brain.upkeep();
+  assert.ok(brain.hist[sym]['1h'].at(-1).t > before, 'lab history includes the new candles');
+  assert.equal(s.status, 'expired');
+  assert.equal(d.status, 'expired', 'the proposal is withdrawn, not left for you to approve');
+  assert.ok([...brain.strategies.values()].filter((x) => x.status === 'failed-lab').length <= 200);
+  assert.ok(brain.decisions.filter((x) => x.status !== 'pending').length <= 100);
+});

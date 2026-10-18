@@ -37,7 +37,7 @@ export async function fetchBars(symbol, range) {
   return { bars, price: r.meta?.regularMarketPrice ?? bars[bars.length - 1]?.c };
 }
 
-// Same shape as the synthetic Feed and OandaFeed, so the brain can use any of them.
+// Same shape as the synthetic Feed, so the brain can use either.
 export class YahooFeed {
   constructor(symbol, bars, price) {
     this.symbol = symbol;

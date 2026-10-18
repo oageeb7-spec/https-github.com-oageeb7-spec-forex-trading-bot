@@ -21,6 +21,15 @@ const SOURCE_REST_MS = 30 * 60_000;
 // When no research is waiting, the Lab explores on its own every LAB_EXPLORE_MS: a known template on
 // the market tested least so far. Keeps every market (meme coins included) covered without research.
 const LAB_EXPLORE_MS = Number(process.env.LAB_EXPLORE_MS) || 60_000;
+// Hourly upkeep: the Lab tests on the newest candles, waiting strategies are re-checked on them, and
+// data nothing uses any more (old failed recipes, old decisions, old seen links) is dropped.
+const UPKEEP_MS = Number(process.env.UPKEEP_MS) || 3600_000;
+const RECHECK_MS = 6 * 3600_000; // a strategy waiting for you is re-checked at most this often
+const KEEP_FAILED = 200; // failed recipes kept for the Strategies page
+const KEEP_DECIDED = 100; // decided decisions kept for the Decisions page
+const KEEP_SEEN = 3000; // research links remembered so they are not read twice
+// Research queries rotate through these endings so repeat searches find new material.
+const QUERY_ENDINGS = ['', ' backtest', ' python', ' results', ' 2026'];
 
 const TOPICS = [
   { topic: 'Time-series momentum on FX majors', template: 'momentum', q: 'time series momentum fx' },
@@ -77,6 +86,7 @@ export class Brain {
     this.pendingTerms = [];
     this.sourceFails = {}; // kind -> { n, until }
     this.lastExplore = 0;
+    this.lastUpkeep = 0;
 
     if (!feeds) {
       feeds = {};
@@ -213,6 +223,7 @@ export class Brain {
       this.direct();
     }
     this.paperStep();
+    if (this.now - this.lastUpkeep >= UPKEEP_MS) this.upkeep();
     if (this.tickNo % 20 === 0) this.budget.history.push({ t: now, spent: round(this.budget.spent, 3) });
     if (this.tickNo % 400 === 0 && !process.env.NODE_TEST_CONTEXT) {
       const c = this.c, busy = Object.values(this.agents).filter((a) => a.status !== 'idle').map((a) => `${a.name}:${a.status}`);
@@ -333,9 +344,11 @@ export class Brain {
       return;
     }
     const n = this.scoutN++;
-    const kind = ok[n % ok.length], tp = TOPICS[Math.floor(n / this.research.kinds.length) % TOPICS.length];
+    const kind = ok[n % ok.length], round = Math.floor(n / this.research.kinds.length);
+    const tp = TOPICS[round % TOPICS.length];
+    const q = tp.q + QUERY_ENDINGS[Math.floor(round / TOPICS.length) % QUERY_ENDINGS.length];
     const where = { youtube: 'YouTube', github: 'GitHub', arxiv: 'arXiv', web: 'Hacker News' }[kind];
-    this.job('scout', `Search ${where}: "${tp.q}"`, () => this.research.search(kind, tp.q), (results) => {
+    this.job('scout', `Search ${where}: "${q}"`, () => this.research.search(kind, q), (results) => {
       if (!results) {
         const f = (this.sourceFails[kind] ||= { n: 0, until: 0 });
         if (++f.n >= 3) {
@@ -348,7 +361,7 @@ export class Brain {
       }
       delete this.sourceFails[kind];
       const fresh = results.filter((r) => r.url && !this.seenUrls.has(r.url));
-      this.emit('SEARCH', `Search ${where}: "${tp.q}" · ${results.length} results, ${fresh.length} new`, 'scout');
+      this.emit('SEARCH', `Search ${where}: "${q}" · ${results.length} results, ${fresh.length} new`, 'scout');
       for (const r of fresh) {
         this.seenUrls.add(r.url);
         const src = { ...r, id: this.id('s'), topic: tp.topic, t: this.now, status: 'queued', size: r.text.split(/\s+/).length };
@@ -573,6 +586,67 @@ export class Brain {
     });
   }
 
+  upkeep() {
+    this.lastUpkeep = this.now;
+    this.refreshHistory();
+    this.recheckWaiting();
+    this.prune();
+  }
+
+  // Rebuild the Lab's history from the feeds, which keep receiving new closed candles.
+  refreshHistory() {
+    let added = 0;
+    for (const sym of this.symbols) {
+      const bars = this.feeds[sym].bars, h = this.hist[sym]['1h'];
+      if (!bars.length || bars[bars.length - 1].t <= h[h.length - 1].t) continue;
+      added += bars.filter((b) => b.t > h[h.length - 1].t).length;
+      const h1 = bars.slice(-HIST_BARS);
+      this.hist[sym] = { '1h': h1, '4h': resample(h1, 4) };
+    }
+    if (added) this.emit('DATA', `Lab history updated with ${added} new candles across ${this.symbols.length} markets`, 'lab');
+  }
+
+  // A strategy that passed the sieve days ago may not hold up on newer prices. Before it can reach
+  // paper, re-test it out of sample on the latest data; withdraw its proposal if it no longer passes.
+  recheckWaiting() {
+    for (const d of this.decisions.filter((x) => x.status === 'pending' && x.kind === 'paper')) {
+      const s = this.strategies.get(d.strategyId);
+      if (!s || this.now - (s.checkedAt ?? s.created ?? 0) < RECHECK_MS) continue;
+      const bars = this.hist[s.symbol][s.tf];
+      const oos = backtest(bars, s.template, s.params, s.symbol, { from: Math.floor(bars.length * SPLIT) }).metrics.sharpe;
+      s.checkedAt = this.now;
+      if (oos > 0.6) {
+        s.oosSharpe = oos;
+        s.spark = downsample(backtest(bars, s.template, s.params, s.symbol).metrics.equity, 24);
+        continue;
+      }
+      s.status = 'expired';
+      s.failReason = `no longer passes on the latest prices (out-of-sample Sharpe ${oos})`;
+      d.status = 'expired';
+      d.decidedAt = Date.now();
+      d.by = 'recheck';
+      this.emit('SIEVE', `${s.name} · re-checked on the latest prices: out-of-sample Sharpe ${oos} · proposal withdrawn`, 'lab');
+    }
+  }
+
+  // Drop data nothing uses any more, so the saved state stays small and fast to save.
+  prune() {
+    const keep = new Set([
+      ...this.paper.keys(), ...this.queues.toLab.map((x) => x.id),
+      ...this.decisions.filter((d) => d.status === 'pending').map((d) => d.strategyId),
+    ]);
+    const dead = [...this.strategies.values()].filter((x) => !keep.has(x.id) && ['failed-lab', 'failed-sieve', 'rejected', 'expired'].includes(x.status));
+    const drop = dead.sort((a, b) => (b.created || 0) - (a.created || 0)).slice(KEEP_FAILED);
+    for (const x of drop) this.strategies.delete(x.id);
+    const decided = this.decisions.filter((d) => d.status !== 'pending');
+    const oldDecided = new Set(decided.slice(0, Math.max(0, decided.length - KEEP_DECIDED)));
+    this.decisions = this.decisions.filter((d) => !oldDecided.has(d));
+    if (this.seenUrls.size > KEEP_SEEN) this.seenUrls = new Set([...this.seenUrls].slice(-KEEP_SEEN));
+    const ids = new Set(this.strategies.keys());
+    this.variants = this.variants.filter((v) => ids.has(v.strategyId));
+    if (drop.length || oldDecided.size) this.emit('DATA', `Cleaned up ${drop.length} old failed recipes and ${oldDecided.size} old decisions`, 'director');
+  }
+
   markVariants(id, passed) {
     for (const v of this.variants) if (v.strategyId === id) v.passed = passed;
   }
@@ -741,6 +815,7 @@ export class Brain {
     for (const k of s.knowledge) Object.assign(this.knowledge.find((x) => x.id === k.id) || {}, k);
     for (const [id, n] of Object.entries(s.agentsDone || {})) if (this.agents[id]) this.agents[id].done = n;
     this.bridge?.restore(s.bridge);
+    this.prune();
     this.emit('RESTORE', `State restored from ${new Date(s.savedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC · ${this.strategies.size} strategies, ${this.paper.size} on paper, ${this.decisions.filter((d) => d.status === 'pending').length} decisions waiting`, 'director');
     return true;
   }
