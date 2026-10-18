@@ -93,7 +93,10 @@ const assistant = new Assistant();
 const DEX_CHAIN = process.env.DEX_CHAIN || (SOURCE === 'synthetic' ? 'off' : 'robinhood');
 const dex = DEX_CHAIN === 'off' ? null : new DexDesk({
   chain: DEX_CHAIN, tradeUsd: Number(process.env.DEX_PAPER_USD) || 100, maxOpen: Number(process.env.DEX_MAX_OPEN) || 5,
-  emit: (kind, text) => brain.emit(kind, text, 'scout'),
+  emit: (kind, text) => {
+    brain.emit(kind, text, 'scout');
+    if (/^DexScreener/.test(text)) console.log(`[dex] ${text}${dex?.error ? ` · last error: ${dex.error}` : ''}`); // scan summary in the server log
+  },
 });
 if (dex) console.log(`DEX desk: DexScreener ${DEX_CHAIN} · scanner and paper trading (no real swaps)`);
 console.log(`Voice assistant: ${assistant.enabled ? 'Claude answers open questions' : 'built-in answers (no Anthropic key)'}`);
