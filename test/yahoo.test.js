@@ -23,7 +23,7 @@ await new Promise((r) => server.listen(0, r));
 process.env.YAHOO_URL = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
 
-const { loadYahooFeeds, fetchBars } = await import('../server/engine/yahoo.js');
+const { loadYahooFeeds, fetchBars, YAHOO_TICKERS } = await import('../server/engine/yahoo.js');
 const { Brain } = await import('../server/engine/brain.js');
 
 test('fetchBars drops gaps and the forming candle', async () => {
@@ -39,7 +39,7 @@ test('loads available instruments, skips missing ones, keeps the last N bars', a
   const { feeds } = await loadYahooFeeds({ bars: 8000, log: (m) => warnings.push(m) });
   assert.deepEqual(Object.keys(feeds), ['EURUSD', 'USDJPY', 'XAUUSD', 'BTCUSD']);
   assert.equal(feeds.EURUSD.bars.length, 8000);
-  assert.equal(warnings.length, 3);
+  assert.equal(warnings.length, Object.keys(YAHOO_TICKERS).length - 4); // every instrument the mock does not serve
 });
 
 test('poll appends only newer candles', async () => {
