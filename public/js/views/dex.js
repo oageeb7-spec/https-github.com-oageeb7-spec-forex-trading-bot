@@ -10,12 +10,12 @@ const age = (h) => (h == null ? '—' : h < 48 ? `${num(h, 0)} h` : `${num(h / 2
 function body(s) {
   const d = s.dex;
   if (!d) return '<div class="panel"><div class="pb">The DEX desk is off (<code>DEX_CHAIN=off</code>, or demo mode). Set <code>DEX_CHAIN=robinhood</code> to scan Robinhood Chain on DexScreener.</div></div>';
-  const st = d.stats;
+  const st = d.stats, cur = d.current || st;
   return `
   <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
     <div class="panel"><div class="pb"><div class="lbl">Coins tracked</div><div class="mono" style="font-size:22px">${d.pairs.length}</div><div class="dim" style="font-size:11px">${d.pairs.filter((p) => p.safe).length} pass the safety filter</div></div></div>
-    <div class="panel"><div class="pb"><div class="lbl">Paper net</div><div class="mono ${st.net >= 0 ? 'green' : 'red'}" style="font-size:22px">${st.net >= 0 ? '+' : '-'}$${num(Math.abs(st.net), 2)}</div><div class="dim" style="font-size:11px">${st.trades} trades · ${st.trades ? pct(st.winrate, 0) : '—'} won</div></div></div>
-    <div class="panel"><div class="pb"><div class="lbl">Open paper trades</div><div class="mono" style="font-size:22px">${d.positions.length} / ${d.trade.maxOpen}</div><div class="dim" style="font-size:11px">$${d.trade.usd} each · stop -${d.trade.stopPct * 100}% · target +${d.trade.targetPct * 100}%</div></div></div>
+    <div class="panel"><div class="pb"><div class="lbl">Paper net · current rules</div><div class="mono ${cur.net >= 0 ? 'green' : 'red'}" style="font-size:22px">${cur.net >= 0 ? '+' : '-'}$${num(Math.abs(cur.net), 2)}</div><div class="dim" style="font-size:11px">${cur.trades} trades · ${cur.trades ? pct(cur.winrate, 0) : '—'} won · all time ${st.net >= 0 ? '+' : '-'}$${num(Math.abs(st.net), 0)} over ${st.trades}</div></div></div>
+    <div class="panel"><div class="pb"><div class="lbl">Open paper trades</div><div class="mono" style="font-size:22px">${d.positions.length} / ${d.trade.maxOpen}</div><div class="dim" style="font-size:11px">up to $${d.trade.usd} each · stop from each coin's swings · target 2× stop</div></div></div>
     <div class="panel"><div class="pb"><div class="lbl">DexScreener</div><div class="mono ${d.error ? 'red' : 'green'}" style="font-size:14px;margin-top:6px">${d.error ? esc(d.error) : d.lastRefresh ? `live · ${ago(d.lastRefresh)}` : 'connecting…'}</div><div class="dim" style="font-size:11px">chain: ${esc(d.chain)}</div></div></div>
   </div>
   ${d.positions.length ? `<div class="panel" style="margin-bottom:12px"><div class="ph"><span class="t">Open paper trades</span></div><table>
@@ -31,7 +31,10 @@ function body(s) {
       Every 10 minutes it looks for coins on ${esc(d.chain)}; every minute it reads their prices and builds 5-minute candles.
       A coin is skipped unless it has at least ${money(d.rules.minLiquidityUsd)} liquidity and ${money(d.rules.minVolume24hUsd)} daily volume, is ${d.rules.minAgeHours}+ hours old,
       has ${d.rules.minSells24h}+ sells a day (so it can be sold), a valuation under ${d.rules.maxFdvToLiquidity}× its liquidity, and moved under ${d.rules.maxMove1hPct}% in the last hour.
-      It paper-buys a coin that closes above its last hour's high with more buyers than sellers, and sells at the stop, the target or after 4 hours, charging 1% for fees and slippage.
+      Coins named like ETH, BTC or a stablecoin are skipped as likely copies, and so are coins up 300%+ in a day.
+      It paper-buys a coin that closes above its last hour's high with at least 1.2 buyers per seller. The stop sits at 3× the coin's average 5-minute swing (8–25%; wilder coins are skipped),
+      the target at twice the stop, and the size shrinks as the stop widens so each stop-out costs about $${num(d.trade.usd * d.trade.riskPct, 0)}. It sells at the stop, the target or after 4 hours, charging 1% for fees and slippage.
+      After a stop a coin rests 2 hours; after 3 losses in a row, a day.
       <b>These checks cannot catch every scam.</b> Paper only: no real swaps are made.</div></div>
   </div>`;
 }

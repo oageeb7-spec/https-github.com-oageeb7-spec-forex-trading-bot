@@ -65,7 +65,7 @@ test('minute prices become 5-minute candles; a breakout paper-buys and the stop 
     // a breakout bar closes above the last hour's high, with more buyers than sellers
     for (let i = 0; i < 6; i++) { now += 60_000; p.priceUsd = '0.0110'; await desk.refresh(); }
     assert.equal(desk.positions.size, 1, 'paper bought the breakout');
-    assert.match(logs.join('\n'), /Paper BUY CASHCAT/);
+    assert.match(logs.join('\n'), /Paper BUY \$\d+ of CASHCAT/);
     // price falls through the 8% stop
     now += 60_000; p.priceUsd = '0.0095'; await desk.refresh();
     assert.equal(desk.positions.size, 0);
@@ -108,4 +108,45 @@ test('one breakout bar gives at most one paper buy', () => {
   desk.closePaper('0xp', desk.pairs.get('0xp'), desk.positions.get('0xp'), 1.2, 'test');
   desk.paperStep();
   assert.equal(desk.positions.size, 0, 'no second buy on the same breakout');
+});
+
+test('copies of major coins and day-long pumps are filtered out', () => {
+  assert.match(safety(pair({ baseToken: { address: '0xfake', symbol: 'ETH', name: 'Ethereum' } })).why.join(), /named like ETH/);
+  assert.match(safety(pair({ priceChange: { h1: 5, h24: 3616 } })).why.join(), /3616% in 24h/);
+});
+
+function breakoutDesk(swing) {
+  const desk = new DexDesk({ fetchImpl: async () => ({ ok: false, status: 500, json: async () => ({}) }) });
+  const bars = Array.from({ length: 30 }, (_, i) => ({ t: i * 300_000, o: 1, h: 1 + swing / 2, l: 1 - swing / 2, c: 1 }));
+  bars[28] = { t: 28 * 300_000, o: 1, h: 1.3, l: 1, c: 1.3 }; // breakout bar
+  bars[29] = { t: 29 * 300_000, o: 1.3, h: 1.3, l: 1.3, c: 1.3 }; // forming bar
+  desk.pairs.set('0xp', { info: pair(), safety: { ok: true, why: [] }, bars });
+  desk.paperStep();
+  return desk;
+}
+
+test('the stop follows the coin\'s own swings and the size keeps the risk the same', () => {
+  const calm = breakoutDesk(0.01).positions.get('0xp');
+  assert.ok(Math.abs(calm.stopPct - 0.08) < 1e-9, 'calm coin: minimum 8% stop');
+  const lively = breakoutDesk(0.05).positions.get('0xp');
+  assert.ok(lively.stopPct > 0.14 && lively.stopPct < 0.2, `lively coin: wider stop, got ${lively.stopPct}`);
+  assert.ok(Math.abs(lively.target / lively.entry - 1 - 2 * lively.stopPct) < 1e-9, 'target is twice the stop');
+  const loss = (p) => p.usd * (p.stopPct + 0.01);
+  assert.ok(Math.abs(loss(calm) - loss(lively)) < 0.01, 'every stop-out costs about the same');
+  assert.equal(breakoutDesk(0.12).positions.size, 0, 'too wild: skipped');
+});
+
+test('a coin rests after a stop, and for a day after three losses in a row', () => {
+  const desk = breakoutDesk(0.01);
+  const x = desk.pairs.get('0xp'), pos = desk.positions.get('0xp');
+  desk.closePaper('0xp', x, pos, pos.stop, 'stop');
+  assert.equal(x.cooldownUntil - x.bars.at(-1).t, 2 * 3600_000);
+  x.lossStreak = 2;
+  x.cooldownUntil = 0;
+  x.lastSignalT = 0;
+  desk.paperStep();
+  const p2 = desk.positions.get('0xp');
+  desk.closePaper('0xp', x, p2, p2.entry * 0.99, 'time');
+  assert.equal(x.cooldownUntil - x.bars.at(-1).t, 24 * 3600_000);
+  assert.equal(desk.view().current.trades, 2, 'trades under the current rules are counted separately');
 });

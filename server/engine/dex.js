@@ -18,10 +18,19 @@ export const RULES = {
   minSells24h: 20, // people are actually selling: a coin nobody can sell is a trap
   maxFdvToLiquidity: 200, // a huge valuation on a thin pool is easy to crash
   maxMove1hPct: 60, // already up (or down) this much in an hour: too late, or collapsing
+  maxMove24hPct: 300, // a coin up 300%+ in a day is a pump to sell into, not to buy
 };
 
-// Paper trading rules on 5-minute bars (long only: a DEX swap buys the coin).
-const TRADE = { breakoutBars: 12, stopPct: 0.08, targetPct: 0.16, maxBars: 48, costPct: 0.01, minBars: 24 };
+// Tokens named after major coins are not meme coins; on a new chain they are usually copies made to
+// fool buyers (a 22-hour-old "ETH" up 3,600% in a day was caught trading on paper).
+const MAJORS = /^(W?ETH|W?BTC|USDC|USDT|USDE|DAI|SOL|BNB)$/i;
+
+// Paper trading rules on 5-minute bars (long only: a DEX swap buys the coin). The stop is set from
+// the coin's own recent swings (3× its average 5-minute range, 8-25%) so ordinary noise does not hit
+// it, the target is twice the stop, and the size shrinks as the stop widens so every stop-out loses
+// about the same. Version 2: fixed 8% stops were hit within minutes on most trades.
+const TRADE = { version: 2, breakoutBars: 12, atrBars: 24, stopAtr: 3, minStop: 0.08, maxStop: 0.25, rr: 2, maxBars: 48, costPct: 0.01, minBars: 24, riskPct: 0.08, buyRatio: 1.2 };
+const COOLDOWN = { afterStop: 2 * HOUR, streak: 3, afterStreak: 24 * HOUR };
 
 export function safety(p, now = Date.now(), r = RULES) {
   const why = [];
@@ -35,6 +44,8 @@ export function safety(p, now = Date.now(), r = RULES) {
   const fdv = p.fdv ?? p.marketCap;
   if (fdv && liq && fdv / liq > r.maxFdvToLiquidity) why.push(`valuation ${Math.round(fdv / liq)}× its liquidity`);
   if (Math.abs(p.priceChange?.h1 ?? 0) > r.maxMove1hPct) why.push(`${Math.round(p.priceChange.h1)}% in 1h`);
+  if ((p.priceChange?.h24 ?? 0) > r.maxMove24hPct) why.push(`up ${Math.round(p.priceChange.h24)}% in 24h (pump)`);
+  if (MAJORS.test(p.baseToken?.symbol || '')) why.push(`named like ${p.baseToken.symbol}: not a meme coin, likely a copy`);
   return { ok: !why.length, why };
 }
 
@@ -142,14 +153,22 @@ export class DexDesk {
         continue;
       }
       if (!x.safety?.ok || this.positions.size >= this.maxOpen || bars.length < TRADE.minBars) continue;
+      if ((x.cooldownUntil ?? 0) > last.t) continue; // resting after a stop or a losing streak
       const closed = bars.slice(-TRADE.breakoutBars - 2, -1); // finished bars before the forming one
       const prev = closed.at(-1), hi = Math.max(...closed.slice(0, -1).map((b) => b.h));
       const h1 = x.info.txns?.h1 || {};
-      if (prev && prev.c > hi && prev.t > (x.lastSignalT ?? 0) && (h1.buys ?? 0) > (h1.sells ?? 0)) {
+      if (prev && prev.c > hi && prev.t > (x.lastSignalT ?? 0) && (h1.buys ?? 0) >= TRADE.buyRatio * Math.max(1, h1.sells ?? 0)) {
         x.lastSignalT = prev.t; // one entry per breakout bar, even if the trade closes quickly
-        const entry = last.c;
-        this.positions.set(k, { pair: k, symbol: x.info.baseToken.symbol, name: x.info.baseToken.name, entry, price: entry, t: last.t, held: 0, usd: this.tradeUsd, stop: entry * (1 - TRADE.stopPct), target: entry * (1 + TRADE.targetPct), url: x.info.url });
-        this.emit('DEX', `Paper BUY ${x.info.baseToken.symbol} at $${fmt(entry)} · breakout with ${h1.buys} buys / ${h1.sells} sells in 1h`);
+        const ranges = bars.slice(-TRADE.atrBars - 1, -1).map((b) => (b.h - b.l) / b.c);
+        const atr = ranges.reduce((a, r) => a + r, 0) / ranges.length;
+        const stopPct = Math.max(TRADE.minStop, TRADE.stopAtr * atr);
+        if (stopPct > TRADE.maxStop) { this.emit('DEX', `Skipped ${x.info.baseToken.symbol}: swings too wild (a safe stop would be ${Math.round(stopPct * 100)}%)`); continue; }
+        const entry = last.c, usd = Math.min(this.tradeUsd, (this.tradeUsd * TRADE.riskPct) / (stopPct + TRADE.costPct));
+        this.positions.set(k, {
+          pair: k, symbol: x.info.baseToken.symbol, name: x.info.baseToken.name, entry, price: entry, t: last.t, held: 0, usd, stopPct,
+          stop: entry * (1 - stopPct), target: entry * (1 + TRADE.rr * stopPct), url: x.info.url,
+        });
+        this.emit('DEX', `Paper BUY $${usd.toFixed(0)} of ${x.info.baseToken.symbol} at $${fmt(entry)} · stop -${Math.round(stopPct * 100)}%, target +${Math.round(TRADE.rr * stopPct * 100)}% · ${h1.buys} buys / ${h1.sells} sells in 1h`);
       }
     }
   }
@@ -157,9 +176,14 @@ export class DexDesk {
   closePaper(k, x, pos, exit, why) {
     const ret = exit / pos.entry - 1 - TRADE.costPct;
     const pnl = pos.usd * ret;
-    this.trades.push({ symbol: pos.symbol, entry: pos.entry, exit, pnl, ret, why, t: Date.now(), held: pos.held, url: pos.url });
+    this.trades.push({ symbol: pos.symbol, entry: pos.entry, exit, pnl, ret, why, t: Date.now(), held: pos.held, url: pos.url, v: pos.stopPct ? TRADE.version : 1 });
     if (this.trades.length > 300) this.trades.shift();
     this.positions.delete(k);
+    // Rest a coin after a stop, and for a day after a losing streak, instead of buying it again at once.
+    x.lossStreak = pnl < 0 ? (x.lossStreak ?? 0) + 1 : 0;
+    const now = x.bars.at(-1)?.t ?? Date.now();
+    if (x.lossStreak >= COOLDOWN.streak) x.cooldownUntil = now + COOLDOWN.afterStreak;
+    else if (why === 'stop') x.cooldownUntil = now + COOLDOWN.afterStop;
     this.emit('DEX', `Paper SELL ${pos.symbol} at $${fmt(exit)} (${why}) · ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
   }
 
@@ -183,11 +207,12 @@ export class DexDesk {
       positions: [...this.positions.values()].map((p) => ({ ...p, pnl: p.usd * (p.price / p.entry - 1 - TRADE.costPct) })),
       trades: this.trades.slice(-40).reverse(),
       stats: { trades: this.trades.length, wins, winrate: this.trades.length ? wins / this.trades.length : 0, net: this.trades.reduce((a, t) => a + t.pnl, 0) },
+      current: summarize(this.trades.filter((t) => t.v === TRADE.version)),
     };
   }
 
   save() {
-    return { pairs: [...this.pairs.entries()].map(([k, x]) => [k, { info: x.info, bars: x.bars.slice(-300), firstSeen: x.firstSeen }]), positions: [...this.positions.entries()], trades: this.trades };
+    return { pairs: [...this.pairs.entries()].map(([k, x]) => [k, { info: x.info, bars: x.bars.slice(-300), firstSeen: x.firstSeen, lastSignalT: x.lastSignalT, lossStreak: x.lossStreak, cooldownUntil: x.cooldownUntil }]), positions: [...this.positions.entries()], trades: this.trades };
   }
 
   restore(s) {
@@ -196,6 +221,11 @@ export class DexDesk {
     this.positions = new Map(s.positions || []);
     this.trades = s.trades || [];
   }
+}
+
+function summarize(trades) {
+  const wins = trades.filter((t) => t.pnl > 0).length;
+  return { trades: trades.length, wins, winrate: trades.length ? wins / trades.length : 0, net: trades.reduce((a, t) => a + t.pnl, 0) };
 }
 
 const fmt = (x) => (x >= 1 ? x.toFixed(4) : x.toPrecision(4));
