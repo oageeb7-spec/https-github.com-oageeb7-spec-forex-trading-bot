@@ -5,9 +5,16 @@
         "source": "github",
         "repo": "affaan-m/ECC"
       }
+    },
+    "agricidaniel-claude-seo": {
+      "source": {
+        "source": "github",
+        "repo": "AgriciDaniel/claude-seo"
+      }
     }
   },
   "enabledPlugins": {
-    "ecc@ecc": true
+    "ecc@ecc": true,
+    "claude-seo@agricidaniel-claude-seo": true
   }
 }
