@@ -1,0 +1,28 @@
+OS Trading AI — Personal Use License
+
+Copyright (c) 2026 OS Trading. All rights reserved.
+
+This license is granted to the person who purchased OS Trading AI ("you").
+
+1. You may install, run and modify the software for your own personal use, on as many
+   computers or servers as you personally use.
+
+2. You may not:
+   a. share, publish, sell, sublicense, rent or otherwise distribute the software or any
+      modified version of it, in whole or in part;
+   b. offer the software, or a service built on it, to other people, whether paid or free;
+   c. remove or alter this license or the copyright notice.
+
+3. The software is provided "as is", without warranty of any kind, express or implied,
+   including fitness for a particular purpose. It is a research and education tool. It does
+   not give financial advice and does not guarantee any trading result. Trading foreign
+   exchange carries a high level of risk, and you are solely responsible for any trading
+   decisions you make and any losses that result.
+
+4. To the extent permitted by law, the copyright holder is not liable for any claim, damages
+   or other liability arising from the use of the software.
+
+5. This license ends automatically if you break its terms. You must then delete all copies.
+
+Third-party packages installed by `npm install` (such as three.js and the Anthropic SDK)
+remain under their own licenses.
