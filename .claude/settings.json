@@ -15,6 +15,7 @@
   },
   "enabledPlugins": {
     "ecc@ecc": true,
-    "claude-seo@agricidaniel-claude-seo": true
+    "claude-seo@agricidaniel-claude-seo": true,
+    "seo-cockpit@agricidaniel-claude-seo": true
   }
 }
