@@ -110,6 +110,17 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "Monte Carlo replay of trader/plan.json: odds of target vs stop. "
         "`run` (optionally `--replays 2000`), `chart`.",
     ),
+    "forex": (
+        "trader-forex/fx.py",
+        {"clock", "quote", "pips", "plan", "size", "scan"},
+        "Forex (currency pairs like EURUSD, GBPJPY). `clock` = is FX open, live sessions; "
+        "`quote EURUSD GBPJPY` = rates and change in pips; `pips EURUSD 1.0850 1.0820` = pip "
+        "distance and pip value per lot; `plan EURUSD --side buy|sell --entry 1.0850 --stop "
+        "1.0820|pips:30 [--target 2R|pips:60|PRICE] --write` = trade plan (entry defaults to the "
+        "latest rate); `size [--account 10000] [--risk-pct 1] --write` = lots from "
+        "trader/fx_plan.json; `scan [EURUSD,GBPUSD]` = trend, 20-day breakouts, RSI, ATR in pips "
+        "(default: majors and crosses).",
+    ),
 }
 
 SYSTEM_PROMPT = """You are JARVIS, a calm, concise trading assistant for one user.
@@ -122,6 +133,9 @@ How to work:
 - Use the tools to get real data. Never invent prices, news or numbers.
 - The pipeline for a day trade is: scanner -> news -> entry -> exit -> timemachine
   -> budget -> risk -> broker. Files pass between steps under trader/.
+- Forex is separate: forex clock -> forex scan -> forex quote -> forex plan ->
+  forex size. Stock tools (scanner, entry, budget, risk, broker) do not handle
+  currency pairs. Forex can be bought or sold short; stocks here are long only.
 - Keep scans small (--symbols or --limit) unless the user asks for a full scan.
 - If a script errors, read the message, fix the arguments and try again once;
   otherwise explain what went wrong.
@@ -174,7 +188,23 @@ def ensure_config() -> bool:
     return True
 
 
-SETTINGS = {  # phrase -> config key
+FOREX_DEFAULTS = {"account_size": 10000, "account_currency": "USD", "risk_pct": 1.0,
+                  "max_loss_per_trade": None, "max_leverage": 30, "min_reward_risk": 1.5,
+                  "min_lot_step": 0.01, "max_lots": 10}
+
+
+def ensure_forex_config() -> None:
+    cfg = json.loads(CONFIG.read_text())
+    if "forex" not in cfg:
+        cfg["forex"] = dict(FOREX_DEFAULTS)
+        CONFIG.write_text(json.dumps(cfg, indent=2) + "\n")
+
+
+SETTINGS = {  # phrase -> config key ("forex.x" = inside the forex section)
+    "forex account": "forex.account_size", "account size": "forex.account_size",
+    "fx account": "forex.account_size", "risk percent": "forex.risk_pct",
+    "risk %": "forex.risk_pct", "risk per trade": "forex.risk_pct",
+    "leverage": "forex.max_leverage", "max lots": "forex.max_lots",
     "budget": "budget", "max loss": "max_loss_per_trade_usd",
     "daily loss": "max_daily_loss_usd", "max order": "max_order_usd",
     "trades per day": "max_trades_per_day", "cash buffer": "cash_buffer_pct",
@@ -184,6 +214,8 @@ SETTINGS = {  # phrase -> config key
 
 def update_setting(text: str) -> str | None:
     t = text.lower()
+    ensure_config()
+    ensure_forex_config()
     if not re.search(r"\b(set|change|make|update)\b", t):
         return None
     for phrase, key in SETTINGS.items():
@@ -191,20 +223,31 @@ def update_setting(text: str) -> str | None:
         if m:
             val = float(m.group(1).replace(",", "")) * (1000 if m.group(2) else 1)
             cfg = json.loads(CONFIG.read_text())
-            cfg[key] = int(val) if val.is_integer() else val
+            val = int(val) if val.is_integer() else val
+            if key.startswith("forex."):
+                cfg.setdefault("forex", dict(FOREX_DEFAULTS))[key[6:]] = val
+            else:
+                cfg[key] = val
             CONFIG.write_text(json.dumps(cfg, indent=2) + "\n")
-            return f"Done: {key} = {cfg[key]} (saved in trader/config.json)."
+            return f"Done: {key} = {val} (saved in trader/config.json)."
     return None
 
 
 def show_settings() -> str:
+    ensure_config()
+    ensure_forex_config()
     cfg = json.loads(CONFIG.read_text())
     keys = ["budget", "max_loss_per_trade_usd", "max_daily_loss_usd", "max_trades_per_day",
             "max_order_usd", "max_position_pct", "cash_buffer_pct", "min_reward_risk",
             "no_entries_before", "no_entries_after", "flat_by", "paper"]
+    fx = cfg.get("forex", {})
+    extra = (f"\nForex: account {fx.get('account_size')} {fx.get('account_currency')}, risk "
+             f"{fx.get('risk_pct')}% a trade, leverage cap {fx.get('max_leverage')}:1, "
+             f"max {fx.get('max_lots')} lots, min reward:risk {fx.get('min_reward_risk')}")
     lines = [f"  {k:24} {cfg.get(k)}" for k in keys]
     return ("Your trading rules (trader/config.json):\n" + "\n".join(lines) +
-            "\nChange one by saying e.g. \"set budget to 10000\" or \"set max loss to 100\".")
+            extra + "\nChange one by saying e.g. \"set budget to 10000\", \"set max loss to 100\" or "
+            "\"set forex account to 25000\".")
 
 
 def run_tool(name: str, args: list[str]) -> tuple[str, bool]:
@@ -372,9 +415,94 @@ def has(text: str, *words: str) -> bool:
     return any(re.search(r"\b" + w, text) for w in words)
 
 
+FX_CCY = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK",
+          "SGD", "HKD", "MXN", "ZAR", "TRY", "PLN", "CNH", "CNY", "INR"}
+FX_NAMES = {"cable": "GBPUSD", "fiber": "EURUSD", "fibre": "EURUSD", "euro": "EURUSD",
+            "pound": "GBPUSD", "sterling": "GBPUSD", "yen": "USDJPY", "gopher": "USDJPY",
+            "loonie": "USDCAD", "aussie": "AUDUSD", "kiwi": "NZDUSD", "swissie": "USDCHF",
+            "franc": "USDCHF", "guppy": "GBPJPY", "geppy": "GBPJPY"}
+
+
+def find_pairs(text: str) -> list[str]:
+    hits: list[tuple[int, str]] = []
+    for m in re.finditer(r"(?<![A-Za-z])([A-Za-z]{3})\s*[/_-]?\s*([A-Za-z]{3})(?![A-Za-z])", text):
+        a, b = m.group(1).upper(), m.group(2).upper()
+        spaced = re.search(r"\s", m.group(0)) is not None
+        if spaced and not (m.group(1).isupper() and m.group(2).isupper()):
+            continue  # "try usd" is not the lira; "TRY USD" or "tryusd" is
+        if a in FX_CCY and b in FX_CCY and a != b:
+            hits.append((m.start(), a + b))
+    low = text.lower()
+    for name, pair in FX_NAMES.items():
+        for m in re.finditer(r"\b" + name + r"s?\b", low):
+            hits.append((m.start(), pair))
+    out: list[str] = []
+    for _, p in sorted(hits):
+        if p not in out:
+            out.append(p)
+    return out
+
+
+def fx_numbers(text: str) -> list[float]:
+    return [float(x) for x in re.findall(r"(?<![\w.])(\d+\.\d+|\d+)(?![\w%])", text)]
+
+
+def route_forex(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | str:
+    t = text.lower()
+    if has(t, "open", "session", "clock", "closed", "hours", "weekend") and not has(t, "plan", "trade", "lots"):
+        return [("forex", ["clock"])]
+    if has(t, "scan", "setup", "breakout", "breaking", "trend", "oversold", "overbought", "which pair", "what pair", "movers"):
+        return [("forex", ["scan", ",".join(pairs)] if len(pairs) > 1 else ["scan"])]
+    if not pairs and has(t, "lots", "size", "how many", "position"):
+        args = ["size", "--write"]
+        m = re.search(r"\$?([\d,]+(?:\.\d+)?)\s*(k\b)?\s*(?:account|balance)|account (?:of )?\$?([\d,]+)\s*(k\b)?", t)
+        if m:
+            num, k = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+            args += ["--account", str(float(num.replace(",", "")) * (1000 if k else 1))]
+        r = re.search(r"(\d+(?:\.\d+)?)\s*%", t)
+        if r:
+            args += ["--risk-pct", r.group(1)]
+        return [("forex", args)]
+    if not pairs:
+        if has(t, "plan"):
+            return "Which pair? e.g. \"plan EURUSD buy at 1.0850 stop 1.0820 target 2R\"."
+        return [("forex", ["clock"]), ("forex", ["quote"])]
+    pair = pairs[0]
+    if has(t, "pip") and len(fx_numbers(text)) >= 2 and not has(t, "plan", "stop"):
+        n = fx_numbers(text)
+        return [("forex", ["pips", pair, str(n[0]), str(n[1])])]
+    if has(t, "plan", "stop", "target", "long", "short", "buy", "sell", "trade"):
+        side = "sell" if has(t, "sell", "short") else "buy"
+        args = ["plan", pair, "--side", side]
+        e = re.search(r"(?:entry|enter|at|@|from)\s*(\d+\.?\d*)", t)
+        if e:
+            args += ["--entry", e.group(1)]
+        st = re.search(r"stop(?:\s*(?:at|loss|of))?\s*(\d+\.?\d*)\s*(pips?|p\b)?", t)
+        if st:
+            args += ["--stop", ("pips:" + st.group(1)) if st.group(2) else st.group(1)]
+        else:
+            args += ["--stop", "pips:30"]
+        tg = re.search(r"target(?:\s*(?:at|of))?\s*(\d+\.?\d*)\s*(pips?|p\b|r\b)?", t)
+        if tg:
+            unit = (tg.group(2) or "").lower()
+            args += ["--target", tg.group(1) + "R" if unit == "r" else
+                     ("pips:" + tg.group(1)) if unit.startswith("p") else tg.group(1)]
+        out = [("forex", args + ["--write"])]
+        if not st:
+            out.append(("_say", ["(No stop given, so I used 30 pips. Say e.g. \"stop 1.0820\" or \"stop 25 pips\".)"]))
+        if has(t, "lots", "size", "how many"):
+            out.append(("forex", ["size", "--write"]))
+        return out
+    return [("forex", ["quote", *pairs])]
+
+
 def route(text: str) -> list[tuple[str, list[str]]] | str:
     """Map a plain-English request to tool runs, or return a reply string."""
     t = text.lower()
+    pairs = find_pairs(text)
+    if pairs or has(t, "forex", "\\bfx\\b", "currenc", "\\bpips?\\b", "how many lots", "lot size"):
+        if not has(t, "set ", "change ", "update ", "my rules", "settings"):
+            return route_forex(text, pairs)
     tickers = find_tickers(text)
     syms = ",".join(tickers)
 
@@ -485,6 +613,13 @@ HELP = """Ask in plain English, for example:
   risk check                     show my order tickets
   alert me if NVDA goes above 200   what is Pelosi trading?
 
+Forex:
+  is forex open?                 price of EURUSD and cable
+  scan the forex majors          pip value EURUSD 1.0850 1.0820
+  plan EURUSD buy at 1.0850 stop 1.0820 target 2R
+  short GBPJPY stop 40 pips target 80 pips    how many lots, 1% risk
+  set forex account to 25000     set leverage to 50
+
 Commands:
   /run <tool> <args>   run a skill script directly, e.g. /run alerts clock
   /tools               list tools        /local  /claude   switch brain
@@ -555,7 +690,9 @@ class Session:
 def main(argv: list[str]) -> int:
     if ensure_config():
         print("(First run: created trader/config.json with starter rules - $5,000 budget, "
-              "$50 max loss a trade, paper trading. Say \"show my rules\" to see them.)")
+              "$50 max loss a trade, paper trading; forex $10,000 account, 1% risk. "
+              "Say \"show my rules\" to see them.)")
+    ensure_forex_config()
     session = Session(quiet=bool(argv))
     if argv:
         q = " ".join(argv)

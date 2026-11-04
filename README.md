@@ -2,7 +2,7 @@
 
 JARVIS is a terminal assistant that answers trading questions in plain English by running the
 trader skills in `.claude/skills/` (scanner, news, entry, exit, time machine, budget, risk,
-broker tickets, alerts, earnings, Congress trades). Claude picks the skill, runs it and
+broker tickets, alerts, earnings, Congress trades) **and forex**. Claude picks the skill, runs it and
 summarises the output.
 
 ```bash
@@ -14,6 +14,26 @@ python jarvis.py "is the market open?"  # one question
 
 Examples: "is the market open?", "scan TSLA, NVDA and AMD for setups", "any news on my
 watchlist?", "how did Apple's last quarter look?", "what has Pelosi filed lately?".
+
+## Forex
+
+JARVIS trades currency pairs too, through the `trader-forex` skill
+(`.claude/skills/trader-forex/fx.py`, also usable as `/trader-forex` in Claude Code):
+
+- **Clock:** is FX open (Sunday 17:00 to Friday 17:00 New York), which of Sydney, Tokyo,
+  London and New York are live, and the London/New York overlap.
+- **Quotes:** any pair (EURUSD, GBP/JPY, "cable", "the yen"…), change in pips. Yahoo, Stooq fallback.
+- **Pip math:** pips between two prices and pip value per standard/mini/micro lot in your
+  account currency (JPY pairs and crosses handled).
+- **Plans:** long *or short*, stop and target as prices, pips or R; warns on tight stops and low reward:risk.
+- **Lot sizing:** from your account size and risk %, capped by leverage (default 30:1) and max lots.
+- **Scanner:** majors and crosses for trend, 20-day breakouts, RSI and ATR in pips.
+
+Try: "is forex open?", "price of EURUSD and cable", "scan the forex majors",
+"plan EURUSD buy at 1.0850 stop 1.0820 target 2R", "short GBPJPY stop 40 pips target 80 pips",
+"how many lots, 1% risk", "set forex account to 25000", "set leverage to 50".
+Forex rules live in the `forex` section of `trader/config.json`. Spread, swap and slippage are
+not included in the numbers, and nothing is ever placed.
 
 **No API key? It still works.** Without a key JARVIS uses a built-in rule-based brain that
 understands the common requests: market clock, quotes, news, scans, opening-range
