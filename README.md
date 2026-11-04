@@ -39,6 +39,12 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
 - **Plans:** long *or short*, stop and target as prices, pips or R; warns on tight stops and low reward:risk.
 - **Lot sizing:** from your account size and risk %, capped by leverage (default 30:1) and max lots.
 - **Scanner:** majors and crosses for trend, 20-day breakouts, RSI and ATR in pips.
+- **Setup finder:** "analyze gold", "give me a signal on EURUSD", "analyze cable on 4h".
+  Reads market structure, breaks of structure, liquidity sweeps, premium/discount and
+  fair-value gaps / order blocks, then gives one decision: buy or sell with entry, stop,
+  TP1, TP2, reward:risk and the reasons, or **No Trade** when reward:risk is under 2.
+  "Track my setup" follows it (pending, open, TP1 hit, target hit, stopped). Rules-based
+  and not backtested, so there is no known win rate.
 
 - **Gold and silver:** XAUUSD / XAGUSD ("price of gold", "buy gold at 2650 stop 2635").
 - **STARTRADER (MetaTrader 5):** read your account and positions ("my STARTRADER account"),
@@ -73,6 +79,7 @@ python3 charts.py TSLA                      # 5 days of 15-minute bars
 python3 charts.py EURUSD=X --range 1mo --interval 1h
 python3 charts.py NVDA --interval 5m --ma 50 --out trader/nvda.html
 python3 charts.py --plan                    # chart the symbol in trader/plan.json
+python3 charts.py --setup                   # chart the forex setup: entry, SL, TP1, TP2, zone
 python3 charts.py TSLA --offline TSLA.json  # read a saved Yahoo chart JSON
 ```
 

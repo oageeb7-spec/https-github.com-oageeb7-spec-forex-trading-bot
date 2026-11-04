@@ -131,6 +131,39 @@ def plan_overlays(sym):
     return lines, caption
 
 
+SETUP_TF = {"15m": ("15m", "5d"), "1h": ("1h", "1mo"), "4h": ("1h", "3mo"), "1d": ("1d", "1y")}
+METAL_FUTURES = {"XAU": "GC=F", "XAG": "SI=F"}
+
+
+def setup_overlays(path):
+    """Read a trader-forex setup.py result. Returns (yahoo symbol, interval,
+    range, price lines, caption)."""
+    s = read_json(path)
+    if not s or not s.get("pair"):
+        raise ChartError("no setup at %s (run setup.py analyze PAIR --write first)" % path)
+    pair = s["pair"]
+    # gold/silver against USD chart the front future, like setup.py; everything else is PAIR=X
+    sym = METAL_FUTURES[pair[:3]] if pair[:3] in METAL_FUTURES and pair[3:] == "USD" else pair + "=X"
+    interval, rng = SETUP_TF.get(s.get("timeframe"), ("15m", "5d"))
+    name = "%s/%s %s" % (pair[:3], pair[3:], s.get("timeframe", ""))
+    if s.get("decision") != "trade":
+        why = (s.get("reasons") or ["no setup"])[-1]
+        return sym, interval, rng, [], "%s: NO TRADE - %s" % (name, why)
+    lines = [{"price": s["entry"], "color": "#2962ff", "title": "Entry %s" % s["entry"]},
+             {"price": s["stop"], "color": "#ef5350", "title": "SL %s" % s["stop"]},
+             {"price": s["tp1"], "color": "#26a69a", "title": "TP1 %s" % s["tp1"]}]
+    if s.get("tp2") is not None:
+        lines.append({"price": s["tp2"], "color": "#00897b", "title": "TP2 %s" % s["tp2"]})
+    z = s.get("zone") or {}
+    for key in ("low", "high"):
+        if z.get(key) is not None:
+            lines.append({"price": z[key], "color": "#9598a1", "title": "zone %s" % key})
+    caption = "%s: %s (%s entry) - reward:risk 1:%s - %s" % (
+        name, s["side"].upper(), s.get("entry_type", "?"), s.get("rr"),
+        "; ".join((s.get("reasons") or [])[:2]))
+    return sym, interval, rng, lines, caption
+
+
 def watchlist_setup(sym):
     wl = read_json(os.path.join(TRADER, "watchlist.json"))
     if not isinstance(wl, dict):
@@ -179,7 +212,8 @@ const C = {
 };
 const ML=8, MR=66, MT=12, MB=26;   // margins (price labels on the right)
 
-function fmt(v){ const a=Math.abs(v); const d = a>=1?2 : 4; return v.toFixed(d); }
+let DEC = 2;   // set from the visible price span so FX shows 4-5 decimals, stocks 2
+function fmt(v){ return v.toFixed(DEC); }
 function vfmt(v){ if(v>=1e9)return (v/1e9).toFixed(1)+'B'; if(v>=1e6)return (v/1e6).toFixed(1)+'M';
   if(v>=1e3)return (v/1e3).toFixed(1)+'K'; return ''+v; }
 function tlabel(sec){ const d=new Date(sec*1000);
@@ -207,6 +241,7 @@ function draw(){
   for(const b of bars){ if(b.low<lo)lo=b.low; if(b.high>hi)hi=b.high; }
   for(const ln of DATA.lines){ if(ln.price<lo)lo=ln.price; if(ln.price>hi)hi=ln.price; }
   const pad=(hi-lo)*0.06 || 1; lo-=pad; hi+=pad;
+  DEC = Math.min(6, Math.max(2, Math.ceil(-Math.log10((hi-lo)/4)) + 1));
   const x=i=> ML + (bars.length===1? cw/2 : i*(cw/(bars.length-1)));
   const y=p=> MT + (hi-p)/(hi-lo)*ch;
 
@@ -250,22 +285,34 @@ function draw(){
     ctx.fillText('MA'+DATA.ma, ML+4, MT+4);
   }
 
-  // overlay price lines (entry / stop / target / OR)
-  ctx.textBaseline='middle';
+  // level lines (entry / stop / targets / zone) at their true price
+  const tags=[];
   for(const ln of DATA.lines){ const yy=y(ln.price);
     ctx.setLineDash([5,4]); ctx.strokeStyle=ln.color; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(ML,yy); ctx.lineTo(W-MR,yy); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle=ln.color; ctx.fillRect(W-MR, yy-8, MR, 16);
-    ctx.fillStyle='#fff'; ctx.textAlign='left';
-    ctx.fillText(ln.title.replace(/[^ -~]/g,''), W-MR+4, yy);
+    tags.push({y:yy, color:ln.color, text:ln.title.replace(/[^ -~]/g,'')});
   }
-
-  // last-price marker
+  // last-price line
   const last=bars[bars.length-1], yl=y(last.close), up=last.close>=last.open;
   ctx.setLineDash([2,3]); ctx.strokeStyle=C.muted; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(ML,yl); ctx.lineTo(W-MR,yl); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle=up?C.up:C.down; ctx.fillRect(W-MR, yl-8, MR, 16);
-  ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(fmt(last.close), W-MR+4, yl);
+  tags.push({y:yl, color:up?C.up:C.down, text:'Last '+fmt(last.close)});
+
+  // labels on the right edge, nudged apart so close levels never hide each other
+  tags.sort((a,b)=>a.y-b.y);
+  const H2=16, minY=MT+H2/2, maxY=MT+ch-H2/2;
+  for(let i=0;i<tags.length;i++){ tags[i].ly=Math.max(minY, tags[i].y);
+    if(i && tags[i].ly < tags[i-1].ly+H2+1) tags[i].ly=tags[i-1].ly+H2+1; }
+  for(let i=tags.length-1;i>=0;i--){   // pull back inside the pane if the stack ran off the bottom
+    const cap = i===tags.length-1 ? maxY : tags[i+1].ly-H2-1;
+    if(tags[i].ly>cap) tags[i].ly=cap; }
+  ctx.textBaseline='middle'; ctx.textAlign='left';
+  for(const t of tags){
+    if(Math.abs(t.ly-t.y)>1){ ctx.strokeStyle=t.color; ctx.lineWidth=1;   // leader from the line to its moved label
+      ctx.beginPath(); ctx.moveTo(W-MR-6,t.y); ctx.lineTo(W-MR,t.ly); ctx.stroke(); }
+    ctx.fillStyle=t.color; ctx.fillRect(W-MR, t.ly-H2/2, MR, H2);
+    ctx.fillStyle='#fff'; ctx.fillText(t.text, W-MR+4, t.ly);
+  }
 }
 draw(); addEventListener('resize', draw);
 </script>
@@ -284,10 +331,25 @@ def main(argv=None):
     ap.add_argument("--out", help="output HTML path (default trader/<symbol>_chart.html)")
     ap.add_argument("--ma", type=int, default=20, help="moving-average period to overlay, 0 to disable (default 20)")
     ap.add_argument("--plan", action="store_true", help="chart the symbol in trader/plan.json")
+    ap.add_argument("--setup", nargs="?", const=os.path.join(TRADER, "fx_setup.json"), metavar="PATH",
+                    help="chart a trader-forex setup (default trader/fx_setup.json): entry, SL, TP1, TP2, zone")
     a = ap.parse_args(argv)
 
+    given = argv if argv is not None else sys.argv[1:]
     sym = a.symbol
-    if a.plan or not sym:
+    setup_view = None
+    if a.setup:
+        try:
+            setup_view = setup_overlays(a.setup)
+        except ChartError as e:
+            print("error: %s" % e, file=sys.stderr)
+            return 1
+        sym = sym or setup_view[0]
+        if "--interval" not in given:
+            a.interval = setup_view[1]
+        if "--range" not in given:
+            a.range = setup_view[2]
+    elif a.plan or not sym:
         plan = read_json(os.path.join(TRADER, "plan.json"))
         if not plan or not plan.get("symbol"):
             ap.error("no symbol given and no trader/plan.json to read one from")
@@ -305,10 +367,13 @@ def main(argv=None):
         print("error: no bars for %s (market closed, or range/interval unsupported)" % sym, file=sys.stderr)
         return 1
 
-    lines, caption = plan_overlays(sym)
-    setup = watchlist_setup(sym)
-    if setup and not caption:
-        caption = "scanner setup: %s" % setup
+    if setup_view:
+        lines, caption = setup_view[3], setup_view[4]
+    else:
+        lines, caption = plan_overlays(sym)
+        scan = watchlist_setup(sym)
+        if scan and not caption:
+            caption = "scanner setup: %s" % scan
     src = "Data: Yahoo chart (%s bars, %s). Unofficial and delayed - a view of your plan, not a trade signal." % (
         a.interval, "offline file" if a.offline else "live fetch")
 

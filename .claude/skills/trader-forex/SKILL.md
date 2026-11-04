@@ -9,12 +9,18 @@ description: >-
   converted), plans a long or short trade with the stop and target in pips
   or R, sizes it in lots from your account and risk percent with a leverage
   cap, and scans the majors and crosses for trend, 20-day breakouts, RSI and
-  ATR in pips. Gold (XAUUSD) and silver (XAGUSD) too. Connects to STARTRADER
+  ATR in pips. Finds intraday setups (setup.py): reads market structure,
+  breaks of structure, liquidity sweeps, premium/discount and fair-value
+  gaps / order blocks on 15m/1h/4h/1d, and returns one decision - buy or sell
+  with entry, stop, TP1, TP2, reward:risk and the reasons - or No Trade, then
+  tracks it. Gold (XAUUSD) and silver (XAGUSD) too. Connects to STARTRADER
   (or any MetaTrader 5 broker) through the MT5 terminal, or to OANDA, to read
   the balance and positions and, only after a risk check and the user's own
   typed yes, send one order with stop-loss and take-profit. Use when the user says "forex", "FX",
   "EUR/USD", "cable", "how many lots", "pip value", "is forex open", "which
-  session", "scan the majors", "gold", "STARTRADER", "MT5", "MetaTrader", "OANDA", "send my forex order", or names a currency pair.
+  session", "scan the majors", "gold", "analyze gold", "give me a signal on
+  EURUSD", "is there a setup", "smart money", "liquidity", "track my setup",
+  "STARTRADER", "MT5", "MetaTrader", "OANDA", "send my forex order", or names a currency pair.
 argument-hint: "[pair] [price]"
 ---
 
@@ -31,11 +37,45 @@ python3 "${CLAUDE_SKILL_DIR}/fx.py" plan GBPJPY --side sell --stop pips:40 --tar
 python3 "${CLAUDE_SKILL_DIR}/fx.py" size --account 10000 --risk-pct 1 --write
 python3 "${CLAUDE_SKILL_DIR}/fx.py" scan                            # majors + main crosses
 python3 "${CLAUDE_SKILL_DIR}/fx.py" scan EURUSD,GBPUSD,AUDUSD
+python3 "${CLAUDE_SKILL_DIR}/setup.py" analyze EURUSD --write --write-plan     # 15m setup or No Trade
+python3 "${CLAUDE_SKILL_DIR}/setup.py" analyze gold --tf 1h --write --write-plan
+python3 "${CLAUDE_SKILL_DIR}/setup.py" track                                   # pending/open/TP1/target/stopped
+python3 charts.py --setup                                                      # chart it: entry, SL, TP1, TP2, zone
 ```
 
 Files: `trader/fx_plan.json` (plan), `trader/fx_orders.json` (proposed order),
-`trader/fx_scan.json`, `trader/fx_rates.json`. Every command takes
-`--offline DIR` (files named `yahoo-EURUSD.json` or `stooq-EURUSD.csv`).
+`trader/fx_scan.json`, `trader/fx_rates.json`, `trader/fx_setup.json` (setup).
+`fx.py` commands take `--offline DIR` (files named `yahoo-EURUSD.json` or
+`stooq-EURUSD.csv`); `setup.py` takes `--offline FILE` (one saved Yahoo chart JSON).
+
+## Setup finder (setup.py)
+
+One decision per run, from the bars alone - nothing is guessed:
+
+1. **Swings** - a bar whose high (low) beats `--swing` bars each side (default 3).
+2. **Structure** - higher highs + higher lows is bullish, lower highs + lower lows bearish.
+3. **Break of structure** - the latest close beyond a prior swing high or low.
+4. **Liquidity sweep** - in the last 30 bars, a wick through a swing low (high) that closed back inside.
+5. **Premium / discount** - where price sits in the last swing range; buys want under 50%, sells over.
+6. **Entry zone** - the latest unfilled fair-value gap in the trade's direction, else the
+   order block before the break. Entry is the middle of the zone (a limit), or the
+   current price if price is already inside it (market). A zone price has already
+   run through is a failed zone: No Trade.
+7. **Stop** - beyond the zone and the protecting swing, plus 0.1 ATR; at least 5 pips
+   (20 on gold, i.e. $2).
+8. **Targets** - TP1 is the first swing beyond the entry (resting liquidity), TP2 the next,
+   else the range extreme.
+9. **Decision** - each signal scores (structure 2, break 2, sweep 1, premium/discount 1). A
+   side needs 4+ and a lead of 2, and reward:risk to the final target must reach
+   `--min-rr` (config `min_setup_rr`, default 2). Otherwise **No Trade**, with the reason.
+
+`--write-plan` writes `trader/fx_plan.json` (target = TP2, `tp1` kept) so `fx.py size`
+and the MT5/OANDA check read it unchanged. `track` walks the bars after the setup:
+a limit entry is `pending` until touched, `missed` if price reaches TP1 first; once
+filled it is `open`, `TP1 hit`, `target hit` or `stopped` (a bar that touches both the
+stop and a target counts as stopped). Gold uses Yahoo's GC=F future, a few dollars
+off spot - check levels against your broker's chart. Tests:
+`python3 -m unittest discover -s .claude/skills/trader-forex/tests` (real EURUSD and gold fixtures).
 
 ## Gold and silver
 
@@ -101,6 +141,7 @@ without the user typing yes for that exact order in this conversation.
 | `max_loss_per_trade` | null | optional hard cap in account currency |
 | `max_leverage` | 30 | notional / account cap (30:1 is the EU/UK retail limit on majors; US is 50:1) |
 | `min_reward_risk` | 1.5 | plan warns under this |
+| `min_setup_rr` | 2.0 | setup.py returns No Trade under this |
 | `min_lot_step` | 0.01 | micro lots |
 | `max_lots` | 10 | hard cap |
 
@@ -117,5 +158,9 @@ without the user typing yes for that exact order in this conversation.
 
 Rates are indicative delayed mids, not dealable quotes. Spread, swap
 (overnight financing) and slippage are not in the numbers. Weekends gap.
-Leverage magnifies losses as much as gains. Education and tooling, not
-financial advice. This skill never places an order.
+Leverage magnifies losses as much as gains. A setup is a rules-based reading
+of past bars, not a prediction. These rules have not been backtested, so there
+is no known win rate - treat setups as a starting point for your own judgement.
+No Trade is a normal answer. Education and tooling, not financial advice. fx.py and
+setup.py never place an order; mt5.py/oanda.py send one only after the risk
+check and your own typed yes.

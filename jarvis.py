@@ -128,6 +128,17 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "trader/fx_plan.json; `scan [EURUSD,GBPUSD]` = trend, 20-day breakouts, RSI, ATR in pips "
         "(default: majors and crosses). Gold and silver work as XAUUSD and XAGUSD.",
     ),
+    "fxsetup": (
+        "trader-forex/setup.py",
+        {"analyze", "track"},
+        "Forex setup finder (EURUSD, XAUUSD gold, any pair). `analyze EURUSD [--tf 15m|1h|4h|1d] "
+        "--write --write-plan` reads market structure, breaks of structure, liquidity sweeps, "
+        "premium/discount and fair-value gaps / order blocks, and returns ONE decision: sell or buy "
+        "with entry, stop, TP1, TP2, reward:risk and the reasons - or No Trade when reward:risk is "
+        "under the minimum (default 2). --write-plan writes trader/fx_plan.json so `forex size` can "
+        "size it. `track` = where price is versus the saved setup (pending, open, TP1 hit, target "
+        "hit, stopped) with pips to each level.",
+    ),
     "fxbroker": (
         FX_BROKER_SCRIPT,
         {"account", "positions", "check", "preview"} | ({"symbol"} if FX_BROKER == "mt5" else set()),
@@ -151,7 +162,9 @@ How to work:
 - The pipeline for a day trade is: scanner -> news -> entry -> exit -> timemachine
   -> budget -> risk -> broker. Files pass between steps under trader/.
 - Forex is separate: forex clock -> forex scan -> forex quote -> forex plan ->
-  forex size -> fxbroker check. Stock tools (scanner, entry, budget, risk, broker) do not handle
+  forex size -> fxbroker check. For "analyze gold / give me a signal on EURUSD", use
+  fxsetup analyze (it writes the plan), then forex size; fxsetup track follows it.
+  When fxsetup says No Trade, report that and its reason - do not invent a trade. Stock tools (scanner, entry, budget, risk, broker) do not handle
   currency pairs. Forex can be bought or sold short; stocks here are long only.
 - Keep scans small (--symbols or --limit) unless the user asks for a full scan.
 - If a script errors, read the message, fix the arguments and try again once;
@@ -478,6 +491,26 @@ def route_forex(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | st
         return [("fxbroker", ["check"]),
                 ("_say", [f"To send it to {FX_BROKER_NAME}, type /fxsend - you'll see the ticket and "
                           "confirm with your own yes."])]
+    if has(t, "track", "how is my", "how's my", "my setup") and not has(t, "plan"):
+        return [("fxsetup", ["track"])]
+    if has(t, "analy", "signal", "read the market", "structure", "liquidity", "smart money", "\\bsmc", "\\bict") \
+            or (pairs and has(t, "setup")):
+        if not pairs:
+            return "Which pair? e.g. \"analyze EURUSD\" or \"analyze gold on 1h\"."
+        args = ["analyze", pairs[0], "--write", "--write-plan"]
+        tf = re.search(r"\b(15\s*m(?:in)?|1\s*h(?:our)?|4\s*h(?:our)?|1\s*d|daily|hourly)\b", t)
+        if tf:
+            v = re.sub(r"\s", "", tf.group(1))
+            if v.startswith("15"):
+                v = "15m"
+            elif v in ("daily", "1d"):
+                v = "1d"
+            elif v.startswith("4"):
+                v = "4h"
+            else:  # 1h, 1hour, hourly
+                v = "1h"
+            args += ["--tf", v]
+        return [("fxsetup", args)]
     if has(t, "open", "session", "clock", "closed", "hours", "weekend") and not has(t, "plan", "trade", "lots"):
         return [("forex", ["clock"])]
     if has(t, "scan", "setup", "breakout", "breaking", "trend", "oversold", "overbought", "which pair", "what pair", "movers"):
@@ -530,7 +563,8 @@ def route(text: str) -> list[tuple[str, list[str]]] | str:
     t = text.lower()
     pairs = find_pairs(text)
     if pairs or has(t, "forex", "\\bfx\\b", "currenc", "oanda", "startrader", "star trader",
-                    "\\bmt5", "metatrader", "meta trader", "send .*broker", "send .*order", "forex order", "\\bpips?\\b", "how many lots", "lot size"):
+                    "\\bmt5", "metatrader", "meta trader", "send .*broker", "send .*order", "forex order", "\\bpips?\\b", "how many lots", "lot size",
+                    "track (?:my |the )?(?:fx |forex )?setup", "my setup", "signals?\\b"):
         if not has(t, "set ", "change ", "update ", "my rules", "settings"):
             return route_forex(text, pairs)
     tickers = find_tickers(text)
