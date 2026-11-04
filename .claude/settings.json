@@ -11,11 +11,25 @@
         "source": "github",
         "repo": "AgriciDaniel/claude-seo"
       }
+    },
+    "addy-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "addyosmani/agent-skills"
+      }
+    },
+    "21st-dev": {
+      "source": {
+        "source": "github",
+        "repo": "21st-dev/magic-mcp"
+      }
     }
   },
   "enabledPlugins": {
     "ecc@ecc": true,
     "claude-seo@agricidaniel-claude-seo": true,
-    "seo-cockpit@agricidaniel-claude-seo": true
+    "seo-cockpit@agricidaniel-claude-seo": true,
+    "agent-skills@addy-agent-skills": true,
+    "21st@21st-dev": true
   }
 }
