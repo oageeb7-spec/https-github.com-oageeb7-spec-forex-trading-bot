@@ -10,7 +10,8 @@ Safety: JARVIS never places, approves or records an order. The broker skill
 is limited to `show` (rendering tickets). Sending an order stays a manual
 step through trader-broker's three gates.
 
-Without credentials it still runs in command mode:  /run <tool> <args...>
+Without an API key it uses a built-in rule-based brain, so plain English
+still works for the common requests; /run <tool> <args...> runs any skill.
 
 Usage:
     pip install -r requirements.txt
@@ -160,6 +161,52 @@ def tool_definitions() -> list[dict]:
     return defs
 
 
+CONFIG = ROOT / "trader" / "config.json"
+
+
+def ensure_config() -> bool:
+    """Create trader/config.json from the example on first run. True if created."""
+    if CONFIG.exists():
+        return False
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    example = SKILLS / "trader-budget" / "config.example.json"
+    CONFIG.write_text(example.read_text())
+    return True
+
+
+SETTINGS = {  # phrase -> config key
+    "budget": "budget", "max loss": "max_loss_per_trade_usd",
+    "daily loss": "max_daily_loss_usd", "max order": "max_order_usd",
+    "trades per day": "max_trades_per_day", "cash buffer": "cash_buffer_pct",
+    "position cap": "max_position_pct", "reward": "min_reward_risk",
+}
+
+
+def update_setting(text: str) -> str | None:
+    t = text.lower()
+    if not re.search(r"\b(set|change|make|update)\b", t):
+        return None
+    for phrase, key in SETTINGS.items():
+        m = re.search(re.escape(phrase) + r"[^\d]{0,20}\$?([\d,]+(?:\.\d+)?)\s*(k\b)?", t)
+        if m:
+            val = float(m.group(1).replace(",", "")) * (1000 if m.group(2) else 1)
+            cfg = json.loads(CONFIG.read_text())
+            cfg[key] = int(val) if val.is_integer() else val
+            CONFIG.write_text(json.dumps(cfg, indent=2) + "\n")
+            return f"Done: {key} = {cfg[key]} (saved in trader/config.json)."
+    return None
+
+
+def show_settings() -> str:
+    cfg = json.loads(CONFIG.read_text())
+    keys = ["budget", "max_loss_per_trade_usd", "max_daily_loss_usd", "max_trades_per_day",
+            "max_order_usd", "max_position_pct", "cash_buffer_pct", "min_reward_risk",
+            "no_entries_before", "no_entries_after", "flat_by", "paper"]
+    lines = [f"  {k:24} {cfg.get(k)}" for k in keys]
+    return ("Your trading rules (trader/config.json):\n" + "\n".join(lines) +
+            "\nChange one by saying e.g. \"set budget to 10000\" or \"set max loss to 100\".")
+
+
 def run_tool(name: str, args: list[str]) -> tuple[str, bool]:
     """Run one skill script. Returns (output, is_error)."""
     if name not in TOOLS:
@@ -238,15 +285,210 @@ class Brain:
         return "Stopped after too many steps. Ask me again more specifically."
 
 
+# ---------------------------------------------------------------- local mode
+# Works with no API key: matches what you typed to a skill with simple rules.
+
+import re
+
+NAMES = {
+    "apple": "AAPL", "tesla": "TSLA", "nvidia": "NVDA", "microsoft": "MSFT",
+    "amazon": "AMZN", "google": "GOOGL", "alphabet": "GOOGL", "meta": "META",
+    "facebook": "META", "netflix": "NFLX", "amd": "AMD", "intel": "INTC",
+    "palantir": "PLTR", "coca-cola": "KO", "coke": "KO", "disney": "DIS",
+    "boeing": "BA", "walmart": "WMT", "jpmorgan": "JPM", "berkshire": "BRK-B",
+    "spy": "SPY", "qqq": "QQQ", "s&p": "SPY", "nasdaq": "QQQ", "bitcoin": "BTC-USD",
+    "coinbase": "COIN", "uber": "UBER", "broadcom": "AVGO", "oracle": "ORCL",
+}
+NOT_TICKERS = {
+    "I", "A", "AN", "AND", "OR", "THE", "IS", "IT", "ME", "MY", "ON", "IN", "OF",
+    "TO", "FOR", "AT", "BY", "UP", "DO", "GO", "NO", "OK", "SO", "US", "WE", "AM",
+    "PM", "NYSE", "ORB", "ATR", "EPS", "CEO", "SEC", "ETF", "USD", "RSI", "IPO",
+    "PTR", "JSON", "API", "AI", "WHAT", "HOW", "WHY", "WHEN", "ANY", "NEWS",
+}
+COMMON = {"aapl", "tsla", "nvda", "msft", "amzn", "googl", "goog", "meta", "nflx",
+          "amd", "intc", "pltr", "spy", "qqq", "coin", "avgo", "orcl", "smci", "mstr",
+          "ko", "dis", "ba", "wmt", "jpm", "uber", "shop", "sofi", "hood", "arm"}
+
+
+def find_tickers(text: str) -> list[str]:
+    hits: list[tuple[int, str]] = []
+    for m in re.finditer(r"\$([A-Za-z]{1,5}(?:[.-][A-Za-z])?)", text):
+        hits.append((m.start(), m.group(1).upper()))
+    low = text.lower()
+    for name, t in NAMES.items():
+        for m in re.finditer(r"(?<![a-z$])" + re.escape(name) + r"(?![a-z])", low):
+            hits.append((m.start(), t))
+    for m in re.finditer(r"(?<![$\w])[A-Za-z][A-Za-z.-]{0,5}", text):
+        w = m.group(0).rstrip(".-")
+        if (w.isupper() and 1 <= len(w) <= 5 and w not in NOT_TICKERS) or w.lower() in COMMON:
+            hits.append((m.start(), w.upper()))
+    out: list[str] = []
+    for _, t in sorted(hits):
+        if t not in out:
+            out.append(t)
+    return out
+
+
+def first_price(text: str) -> float | None:
+    m = re.search(r"(?<![\w.])\$?(\d+(?:\.\d+)?)(?![\w%])", text)
+    return float(m.group(1)) if m else None
+
+
+def entry_time_now() -> str:
+    """Current New York time on a 5-minute bar close, kept inside the session."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("America/New_York"))
+    mins = now.hour * 60 + now.minute
+    mins = min(max(mins - mins % 5, 9 * 60 + 45), 15 * 60 + 25)
+    h, m = divmod(mins, 60)
+    return f"{(h - 1) % 12 + 1}:{m:02d} {'AM' if h < 12 else 'PM'}"
+
+
+def exit_plan(text: str, ticker: str) -> list[tuple[str, list[str]]]:
+    t = text.lower()
+    entry = re.search(r"(?:entry|enter|in at|at|@)\s*\$?(\d+(?:\.\d+)?)", t)
+    price = float(entry.group(1)) if entry else first_price(text)
+    args = ["plan", "--symbol", ticker, "--entry", str(price)]
+    stop = re.search(r"stop(?:\s*(?:at|loss|of))?\s*\$?(\d+(?:\.\d+)?)(\s*%)?", t)
+    target = re.search(r"target(?:\s*(?:at|of))?\s*\$?(\d+(?:\.\d+)?)(\s*r\b)?", t)
+    say = []
+    if stop:
+        args += ["--stop", ("pct:" if stop.group(2) else "price:") + stop.group(1)]
+    else:
+        args += ["--stop", "pct:1"]
+        say = [("_say", ["(No stop given, so I used 1% below the entry. Say e.g. \"stop 358\" to set it.)"])]
+    tm = re.search(r"\b(\d{1,2}:\d{2})\s*(am|pm)?", t)
+    if tm:
+        args += ["--time", tm.group(1) + (" " + tm.group(2).upper() if tm.group(2) else "")]
+    else:
+        args += ["--time", entry_time_now()]
+    if target:
+        args += ["--target", (target.group(1) + "R") if target.group(2) else "price:" + target.group(1)]
+    return [("exit", args + ["--write"]), *say]
+
+
+def has(text: str, *words: str) -> bool:
+    return any(re.search(r"\b" + w, text) for w in words)
+
+
+def route(text: str) -> list[tuple[str, list[str]]] | str:
+    """Map a plain-English request to tool runs, or return a reply string."""
+    t = text.lower()
+    tickers = find_tickers(text)
+    syms = ",".join(tickers)
+
+    if has(t, "my rules", "settings", "my limits", "config"):
+        if not has(t, "set ", "change", "update"):
+            return show_settings()
+    changed = update_setting(text)
+    if changed:
+        return changed
+    if has(t, "hello", "hi\\b", "hey", "thank"):
+        return "At your service. Ask about quotes, news, scans, earnings, Congress trades or a trade plan. /help lists examples."
+    if has(t, "pelosi", "congress", "politician", "senator", "representative"):
+        member = re.search(r"(pelosi|[A-Z][a-z]+(?= (?:trades|bought|sold|filed)))", text, re.I)
+        args = ["index", "--limit", "20"]
+        if member:
+            args += ["--member", member.group(1)]
+        return [("pelosi", args)]
+    if has(t, "market open", "is the market", "market hours", "opening bell", "clock", "market close", "open today", "closed today", "holiday"):
+        return [("alerts", ["clock"])]
+    if has(t, "earning", "revenue", "margin", "quarter", "10-q", "10-k", "eps", "profit"):
+        if not tickers:
+            return "Which company? e.g. \"earnings for AAPL\"."
+        return [("analyst", tickers[:3])]
+    if has(t, "news", "headline", "why is .* moving", "8-k", "briefing", "what happened"):
+        return [("news", ["--tickers", *tickers] if tickers else [])]
+    if has(t, "plan", "stop", "target") and tickers and first_price(text):
+        return exit_plan(text, tickers[0])
+    if has(t, "opening range", "orb\\b"):
+        if has(t, "scan", "find", "which", "what", "breakouts"):
+            return [("scanner", ["orb", "--symbols", syms] if tickers else ["orb", "--limit", "200"])]
+        if tickers:
+            return [("entry", ["check", tickers[0]])]
+    if has(t, "scan", "setup", "breaking out", "breakout", "bull flag", "oversold", "watchlist", "what should i"):
+        if has(t, "watchlist") and has(t, "check", "entry", "trigger"):
+            return [("entry", ["watchlist"])]
+        return [("scanner", ["daily", "--symbols", syms] if tickers else ["daily", "--limit", "200"])]
+    if has(t, "entry", "get in", "broken out", "broke out", "triggered"):
+        if not tickers:
+            return [("entry", ["watchlist"])]
+        args = ["check", tickers[0]]
+        lvl = first_price(text)
+        if lvl and has(t, "above", "level", "break"):
+            args += ["--setup", "level", "--level", str(lvl)]
+        return [("entry", args)]
+    if has(t, "time machine", "odds", "simulate", "monte carlo", "backtest", "replay", "coin flip"):
+        return [("timemachine", ["run", "--replays", "2000"])]
+    if has(t, "stop", "target", "exit", "plan", "risk reward", "my r\\b", "get out"):
+        if tickers and first_price(text):
+            return exit_plan(text, tickers[0])
+        if has(t, "make", "set", "new", "create") and not tickers:
+            return [("exit", ["plan", "--write"])]
+        return [("exit", ["show"])]
+    if has(t, "how many shares", "size", "position siz", "budget", "how much should"):
+        m = re.search(r"\$?([\d,]+(?:\.\d+)?)\s*(k\b)?", t)
+        args = []
+        if m and has(t, "budget", "have", "with", "\\$"):
+            amt = float(m.group(1).replace(",", "")) * (1000 if m.group(2) else 1)
+            args = ["--budget", str(amt)]
+        return [("budget", [*args, "--write"])]
+    if has(t, "risk", "safe", "check my order"):
+        return [("risk", [])]
+    if has(t, "ticket", "order", "buy", "sell", "place", "execute"):
+        return [("broker", ["show"]),
+                ("_say", ["JARVIS can't place orders. To send one, use /trader-broker in Claude Code, which asks for your yes."])]
+    if has(t, "alert"):
+        if tickers and first_price(text):
+            side = "--below" if has(t, "below", "under", "drop", "falls") else "--above"
+            return [("alerts", ["add", "--symbol", tickers[0], side, str(first_price(text))])]
+        if has(t, "check", "ring", "hit"):
+            return [("alerts", ["check"])]
+        return [("alerts", ["list"])]
+    if tickers or has(t, "price", "quote", "trading at", "how much is"):
+        if not tickers:
+            return "Which ticker? e.g. \"price of TSLA\"."
+        return [("alerts", ["quote", *tickers])]
+    return ("I didn't catch that. Try: \"is the market open?\", \"price of TSLA\", \"news on NVDA\", "
+            "\"scan AAPL MSFT AMD\", \"earnings for KO\", \"what is Pelosi trading?\" or /help.")
+
+
+def local_answer(text: str) -> str:
+    plan = route(text)
+    if isinstance(plan, str):
+        return plan
+    parts = []
+    for name, args in plan:
+        if name == "_say":
+            parts.append(args[0])
+            continue
+        print(f"  > {name} {shlex.join(args)}", flush=True)
+        out, err = run_tool(name, args)
+        if err and name == "alerts" and args[:1] == ["quote"]:
+            print("  > Yahoo failed, trying Stooq", flush=True)
+            out2, err2 = run_tool(name, [*args, "--source", "stooq"])
+            if not err2:
+                out, err = out2, err2
+        parts.append(("[problem] " if err else "") + out)
+    return "\n\n".join(parts)
+
+
 # ---------------------------------------------------------------- the shell
 
-HELP = """Commands:
-  <anything>             ask JARVIS in plain English (needs Claude credentials)
-  /run <tool> <args>     run a skill script directly, e.g. /run alerts clock
-  /tools                 list tools
-  /reset                 forget the conversation
-  /help                  this help
-  /quit                  exit"""
+HELP = """Ask in plain English, for example:
+  is the market open?            price of TSLA and NVDA
+  news on AAPL                   scan TSLA NVDA AMD for setups
+  opening range breakouts in SPY earnings for KO
+  has TSLA broken out?           plan TSLA entry 364.20
+  what are the odds?             how many shares with a $5000 budget
+  risk check                     show my order tickets
+  alert me if NVDA goes above 200   what is Pelosi trading?
+
+Commands:
+  /run <tool> <args>   run a skill script directly, e.g. /run alerts clock
+  /tools               list tools        /local  /claude   switch brain
+  /reset               forget the chat   /help   /quit"""
 
 
 def handle_run(line: str) -> None:
@@ -258,52 +500,72 @@ def handle_run(line: str) -> None:
     print(out if not err else "[error]\n" + out)
 
 
-def make_brain() -> Brain | None:
+def has_credentials() -> bool:
+    if os.environ.get("JARVIS_OFFLINE"):
+        return False
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return True
+    cfg = Path(os.environ.get("ANTHROPIC_CONFIG_DIR", Path.home() / ".config" / "anthropic"))
+    return cfg.is_dir() and any(cfg.iterdir())
+
+
+def make_brain(quiet: bool = False) -> Brain | None:
+    if not has_credentials():
+        if not quiet:
+            print("(No Claude API key found - using JARVIS's built-in brain. "
+                  "Set ANTHROPIC_API_KEY for full conversation.)")
+        return None
     try:
         return Brain()
     except ImportError:
-        print("! The anthropic package is not installed: pip install -r requirements.txt")
-    except Exception as e:  # missing credentials raise at construction
-        print(f"! Claude is not available ({e.__class__.__name__}: {e}).")
-        print("  Set ANTHROPIC_API_KEY or run `ant auth login`.")
-    print("  Command mode only: /run <tool> <args>. Type /help.")
+        print("(anthropic package missing - pip install -r requirements.txt. Using built-in brain.)")
+    except Exception as e:
+        print(f"(Claude unavailable: {e}. Using built-in brain.)")
     return None
 
 
-def answer(brain: Brain | None, text: str) -> None:
-    if brain is None:
-        print("I need Claude credentials to understand plain English. Try /run alerts clock")
-        return
-    a = brain.anthropic
-    try:
-        print("\nJARVIS: " + brain.ask(text) + "\n")
-    except a.AuthenticationError:
-        print("! Invalid API key. Check ANTHROPIC_API_KEY.")
-        brain.messages.pop()
-    except a.RateLimitError:
-        print("! Rate limited. Wait a moment and try again.")
-        brain.messages.pop()
-    except a.APIStatusError as e:
-        print(f"! Claude API error {e.status_code}: {e.message}")
-        brain.messages.clear()
-    except a.APIConnectionError:
-        print("! Can't reach the Claude API. Check your connection.")
-        brain.messages.pop()
-    except TypeError as e:  # raised when no credentials could be resolved
-        print(f"! No Claude credentials: {e}\n  Set ANTHROPIC_API_KEY or run `ant auth login`.")
-        brain.messages.clear()
+class Session:
+    def __init__(self, quiet: bool = False) -> None:
+        self.brain = make_brain(quiet)
+
+    def answer(self, text: str) -> None:
+        if self.brain is None:
+            print("\nJARVIS: " + local_answer(text) + "\n")
+            return
+        b = self.brain
+        a = b.anthropic
+        fallback = None
+        try:
+            print("\nJARVIS: " + b.ask(text) + "\n")
+        except (a.AuthenticationError, a.PermissionDeniedError, TypeError):
+            fallback = "Claude rejected the API key"
+            self.brain = None
+        except a.RateLimitError:
+            fallback = "Claude is rate limited"
+        except a.APIConnectionError:
+            fallback = "can't reach Claude"
+        except a.APIStatusError as e:
+            fallback = f"Claude error {e.status_code}"
+        if fallback:
+            del b.messages[:]  # start clean next time
+            print(f"({fallback} - answering with the built-in brain.)")
+            print("\nJARVIS: " + local_answer(text) + "\n")
 
 
 def main(argv: list[str]) -> int:
-    brain = make_brain()
+    if ensure_config():
+        print("(First run: created trader/config.json with starter rules - $5,000 budget, "
+              "$50 max loss a trade, paper trading. Say \"show my rules\" to see them.)")
+    session = Session(quiet=bool(argv))
     if argv:
         q = " ".join(argv)
         if q.startswith("/run"):
             handle_run(q)
         else:
-            answer(brain, q)
+            session.answer(q)
         return 0
-    print("JARVIS online. Ask me about the market, or /help.")
+    mode = "Claude" if session.brain else "built-in"
+    print(f"JARVIS online ({mode} brain). Ask me about the market, or /help.")
     while True:
         try:
             line = input("you> ").strip()
@@ -313,22 +575,28 @@ def main(argv: list[str]) -> int:
         if not line:
             continue
         cmd = line.split()[0].lower()
-        if cmd in ("/quit", "/exit", "quit", "exit"):
+        if cmd in ("/quit", "/exit", "quit", "exit", "bye"):
             print("Goodbye.")
             return 0
-        if cmd == "/help":
+        if cmd in ("/help", "help", "?"):
             print(HELP)
         elif cmd == "/tools":
             for n, (_, _, d) in TOOLS.items():
                 print(f"  {n:12} {d.split('. ')[0]}")
         elif cmd == "/reset":
-            if brain:
-                brain.messages.clear()
+            if session.brain:
+                session.brain.messages.clear()
             print("Conversation cleared.")
+        elif cmd == "/local":
+            session.brain = None
+            print("Using the built-in brain.")
+        elif cmd == "/claude":
+            session.brain = make_brain()
+            print("Using Claude." if session.brain else "Still on the built-in brain.")
         elif cmd == "/run":
             handle_run(line)
         else:
-            answer(brain, line)
+            session.answer(line)
 
 
 if __name__ == "__main__":
