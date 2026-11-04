@@ -119,7 +119,15 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "1.0820|pips:30 [--target 2R|pips:60|PRICE] --write` = trade plan (entry defaults to the "
         "latest rate); `size [--account 10000] [--risk-pct 1] --write` = lots from "
         "trader/fx_plan.json; `scan [EURUSD,GBPUSD]` = trend, 20-day breakouts, RSI, ATR in pips "
-        "(default: majors and crosses).",
+        "(default: majors and crosses). Gold and silver work as XAUUSD and XAGUSD.",
+    ),
+    "fxbroker": (
+        "trader-forex/oanda.py",
+        {"account", "positions", "check", "preview"},
+        "OANDA forex broker, READ ONLY from here: `account` = balance and margin; "
+        "`positions` = open positions; `check [--index 1]` = risk-check the proposed order in "
+        "trader/fx_orders.json; `preview` = the exact order JSON. Sending is NOT available to you: "
+        "the user types /fxsend in JARVIS and confirms with their own yes.",
     ),
 }
 
@@ -134,7 +142,7 @@ How to work:
 - The pipeline for a day trade is: scanner -> news -> entry -> exit -> timemachine
   -> budget -> risk -> broker. Files pass between steps under trader/.
 - Forex is separate: forex clock -> forex scan -> forex quote -> forex plan ->
-  forex size. Stock tools (scanner, entry, budget, risk, broker) do not handle
+  forex size -> fxbroker check. Stock tools (scanner, entry, budget, risk, broker) do not handle
   currency pairs. Forex can be bought or sold short; stocks here are long only.
 - Keep scans small (--symbols or --limit) unless the user asks for a full scan.
 - If a script errors, read the message, fix the arguments and try again once;
@@ -145,6 +153,8 @@ Hard limits:
 - You cannot place, approve or record orders. If the user wants to trade, show the
   ticket (broker show) and tell them to send it themselves through /trader-broker
   in Claude Code, which asks for their explicit yes.
+- Forex orders are sent only when the user types /fxsend and answers yes in the
+  terminal. Never claim an order was sent unless the user shows you that it was.
 - Present data neutrally. You are not a financial adviser; do not tell the user
   to buy or sell. Data is delayed and may be incomplete.
 """
@@ -415,12 +425,13 @@ def has(text: str, *words: str) -> bool:
     return any(re.search(r"\b" + w, text) for w in words)
 
 
-FX_CCY = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK",
+FX_CCY = {"XAU", "XAG", "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK",
           "SGD", "HKD", "MXN", "ZAR", "TRY", "PLN", "CNH", "CNY", "INR"}
 FX_NAMES = {"cable": "GBPUSD", "fiber": "EURUSD", "fibre": "EURUSD", "euro": "EURUSD",
             "pound": "GBPUSD", "sterling": "GBPUSD", "yen": "USDJPY", "gopher": "USDJPY",
             "loonie": "USDCAD", "aussie": "AUDUSD", "kiwi": "NZDUSD", "swissie": "USDCHF",
-            "franc": "USDCHF", "guppy": "GBPJPY", "geppy": "GBPJPY"}
+            "franc": "USDCHF", "guppy": "GBPJPY", "geppy": "GBPJPY",
+            "gold": "XAUUSD", "silver": "XAGUSD"}
 
 
 def find_pairs(text: str) -> list[str]:
@@ -430,7 +441,7 @@ def find_pairs(text: str) -> list[str]:
         spaced = re.search(r"\s", m.group(0)) is not None
         if spaced and not (m.group(1).isupper() and m.group(2).isupper()):
             continue  # "try usd" is not the lira; "TRY USD" or "tryusd" is
-        if a in FX_CCY and b in FX_CCY and a != b:
+        if a in FX_CCY and b in FX_CCY and a != b and b not in ("XAU", "XAG"):
             hits.append((m.start(), a + b))
     low = text.lower()
     for name, pair in FX_NAMES.items():
@@ -449,6 +460,13 @@ def fx_numbers(text: str) -> list[float]:
 
 def route_forex(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | str:
     t = text.lower()
+    if has(t, "oanda", "broker", "my account", "balance", "margin", "positions", "send", "place", "execute"):
+        if has(t, "position"):
+            return [("fxbroker", ["positions"])]
+        if has(t, "account", "balance", "margin"):
+            return [("fxbroker", ["account"])]
+        return [("fxbroker", ["check"]),
+                ("_say", ["To send it to OANDA, type /fxsend - you'll see the ticket and confirm with your own yes."])]
     if has(t, "open", "session", "clock", "closed", "hours", "weekend") and not has(t, "plan", "trade", "lots"):
         return [("forex", ["clock"])]
     if has(t, "scan", "setup", "breakout", "breaking", "trend", "oversold", "overbought", "which pair", "what pair", "movers"):
@@ -500,7 +518,7 @@ def route(text: str) -> list[tuple[str, list[str]]] | str:
     """Map a plain-English request to tool runs, or return a reply string."""
     t = text.lower()
     pairs = find_pairs(text)
-    if pairs or has(t, "forex", "\\bfx\\b", "currenc", "\\bpips?\\b", "how many lots", "lot size"):
+    if pairs or has(t, "forex", "\\bfx\\b", "currenc", "oanda", "\\bpips?\\b", "how many lots", "lot size"):
         if not has(t, "set ", "change ", "update ", "my rules", "settings"):
             return route_forex(text, pairs)
     tickers = find_tickers(text)
@@ -619,11 +637,112 @@ Forex:
   plan EURUSD buy at 1.0850 stop 1.0820 target 2R
   short GBPJPY stop 40 pips target 80 pips    how many lots, 1% risk
   set forex account to 25000     set leverage to 50
+  price of gold                  buy gold at 2650 stop 2635 target 2R
+  my OANDA account               my forex positions
 
 Commands:
   /run <tool> <args>   run a skill script directly, e.g. /run alerts clock
   /tools               list tools        /local  /claude   switch brain
+  /fxsend [n]          send proposed forex order n to OANDA (asks for your yes)
+  /voice on|off        speak answers aloud; Enter on an empty line to talk
   /reset               forget the chat   /help   /quit"""
+
+
+# ---------------------------------------------------------------- voice
+
+class Voice:
+    """Microphone in, speech out. Optional: pip install -r requirements-voice.txt"""
+
+    def __init__(self) -> None:
+        self.tts = self.rec = self.sr = None
+        problems = []
+        try:
+            import pyttsx3
+            self.tts = pyttsx3.init()
+            self.tts.setProperty("rate", 185)
+        except Exception as e:
+            problems.append(f"speech out unavailable ({e.__class__.__name__}: {e})")
+        try:
+            import speech_recognition as sr
+            import pyaudio  # noqa: F401  (sr.Microphone needs it)
+            self.sr, self.rec = sr, sr.Recognizer()
+        except Exception as e:
+            problems.append(f"microphone unavailable ({e.__class__.__name__}: {e})")
+        self.problems = problems
+
+    @property
+    def can_listen(self) -> bool:
+        return self.rec is not None
+
+    def listen(self) -> str | None:
+        if not self.rec:
+            return None
+        sr = self.sr
+        try:
+            with sr.Microphone() as mic:
+                self.rec.adjust_for_ambient_noise(mic, duration=0.4)
+                print("  (listening...)", flush=True)
+                audio = self.rec.listen(mic, timeout=6, phrase_time_limit=15)
+            text = self.rec.recognize_google(audio)
+            print(f"you said> {text}")
+            return text
+        except sr.WaitTimeoutError:
+            print("  (heard nothing)")
+        except sr.UnknownValueError:
+            print("  (didn't catch that)")
+        except Exception as e:
+            print(f"  (voice error: {e})")
+        return None
+
+    def say(self, text: str) -> None:
+        if not self.tts:
+            return
+        try:
+            self.tts.say(speakable(text))
+            self.tts.runAndWait()
+        except Exception as e:
+            print(f"  (speech error: {e})")
+
+
+def speakable(text: str, limit: int = 320) -> str:
+    """The first sentences of an answer, without tables, JSON or symbols."""
+    keep = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("{", "}", '"', "[", "  >", "POST")) or line.count("  ") > 2:
+            continue
+        keep.append(line)
+        if sum(len(k) for k in keep) > limit:
+            break
+    out = " ".join(keep)[:limit + 80]
+    for a, b in (("/", " "), ("$", " dollars "), ("%", " percent"), ("->", " to "), ("~", "about ")):
+        out = out.replace(a, b)
+    return out
+
+
+# ---------------------------------------------------------------- forex send
+
+def fx_send(index: int, ask=input) -> None:
+    """Show the ticket, risk-check it, and send only on the user's typed yes."""
+    oanda = [sys.executable, str(SKILLS / "trader-forex" / "oanda.py")]
+    chk = subprocess.run([*oanda, "check", "--index", str(index)], cwd=ROOT,
+                         capture_output=True, text=True)
+    print((chk.stdout + chk.stderr).strip())
+    if chk.returncode != 0:
+        print("Not sent.")
+        return
+    acct = os.environ.get("OANDA_ENV", "practice").upper()
+    try:
+        reply = ask(f"Send order {index} to OANDA {acct}? Type yes to send, anything else cancels: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        reply = ""
+    if reply.lower() not in ("yes", "y", "yes send it", "send it", "confirm"):
+        print("Cancelled. Nothing was sent.")
+        return
+    res = subprocess.run([*oanda, "send", "--index", str(index), "--confirm", reply], cwd=ROOT,
+                         capture_output=True, text=True, timeout=60)
+    print((res.stdout + res.stderr).strip())
+
 
 
 def handle_run(line: str) -> None:
@@ -662,16 +781,23 @@ def make_brain(quiet: bool = False) -> Brain | None:
 class Session:
     def __init__(self, quiet: bool = False) -> None:
         self.brain = make_brain(quiet)
+        self.voice: Voice | None = None
+        self.speak = False
+
+    def out(self, text: str) -> None:
+        print("\nJARVIS: " + text + "\n")
+        if self.speak and self.voice:
+            self.voice.say(text)
 
     def answer(self, text: str) -> None:
         if self.brain is None:
-            print("\nJARVIS: " + local_answer(text) + "\n")
+            self.out(local_answer(text))
             return
         b = self.brain
         a = b.anthropic
         fallback = None
         try:
-            print("\nJARVIS: " + b.ask(text) + "\n")
+            self.out(b.ask(text))
         except (a.AuthenticationError, a.PermissionDeniedError, TypeError):
             fallback = "Claude rejected the API key"
             self.brain = None
@@ -684,10 +810,24 @@ class Session:
         if fallback:
             del b.messages[:]  # start clean next time
             print(f"({fallback} - answering with the built-in brain.)")
-            print("\nJARVIS: " + local_answer(text) + "\n")
+            self.out(local_answer(text))
+
+    def voice_on(self) -> None:
+        self.voice = self.voice or Voice()
+        for p in self.voice.problems:
+            print(f"  ({p})")
+        if self.voice.problems:
+            print("  Install voice support: pip install -r requirements-voice.txt "
+                  "(PyAudio may need portaudio: brew install portaudio / apt install portaudio19-dev; "
+                  "on Linux, speech out needs espeak-ng: apt install espeak-ng)")
+        self.speak = self.voice.tts is not None
+        if self.speak or self.voice.can_listen:
+            print("Voice on." + (" Press Enter on an empty line to talk." if self.voice.can_listen else ""))
 
 
 def main(argv: list[str]) -> int:
+    use_voice = "--voice" in argv
+    argv = [x for x in argv if x != "--voice"]
     if ensure_config():
         print("(First run: created trader/config.json with starter rules - $5,000 budget, "
               "$50 max loss a trade, paper trading; forex $10,000 account, 1% risk. "
@@ -703,12 +843,21 @@ def main(argv: list[str]) -> int:
         return 0
     mode = "Claude" if session.brain else "built-in"
     print(f"JARVIS online ({mode} brain). Ask me about the market, or /help.")
+    if use_voice:
+        session.voice_on()
+        if session.speak:
+            session.voice.say("JARVIS online.")
     while True:
+        listening = bool(session.voice and session.voice.can_listen)
         try:
-            line = input("you> ").strip()
+            line = input("you (Enter to talk)> " if listening else "you> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye.")
             return 0
+        if not line and listening:
+            line = (session.voice.listen() or "").strip()
+            if line.lower().startswith("/fx") or "send" in line.lower().split()[:1]:
+                print("  (orders are confirmed by typing, not by voice)")
         if not line:
             continue
         cmd = line.split()[0].lower()
@@ -732,6 +881,16 @@ def main(argv: list[str]) -> int:
             print("Using Claude." if session.brain else "Still on the built-in brain.")
         elif cmd == "/run":
             handle_run(line)
+        elif cmd == "/fxsend":
+            parts = line.split()
+            fx_send(int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1)
+        elif cmd == "/voice":
+            if line.lower().endswith("off"):
+                session.speak = False
+                session.voice = None
+                print("Voice off.")
+            else:
+                session.voice_on()
         else:
             session.answer(line)
 

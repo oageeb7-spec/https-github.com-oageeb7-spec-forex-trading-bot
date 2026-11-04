@@ -9,6 +9,8 @@
   scan [EURUSD,GBPUSD,...]       daily trend, 20-day breakout, RSI, ATR in pips
 
 Data: free delayed Yahoo chart JSON (EURUSD=X), Stooq CSV as the fallback.
+Gold (XAUUSD) and silver (XAGUSD): Stooq spot first; Yahoo falls back to the
+front-month futures (GC=F, SI=F), which trade a few dollars off spot.
 Rates are indicative, not dealable: your broker's bid/ask is what fills.
 Nothing here places an order.
 """
@@ -35,6 +37,18 @@ CURRENCIES = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NO
 MAJORS = ["EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"]
 CROSSES = ["EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURCHF", "EURAUD", "CADJPY"]
 LOT = 100_000  # units in a standard lot
+METALS = {  # symbol: (contract size in oz per lot, pip size, decimals, Yahoo futures)
+    "XAU": (100, 0.1, 2, "GC=F"),
+    "XAG": (5000, 0.01, 3, "SI=F"),
+}
+
+
+def contract(pair: str) -> int:
+    return METALS[pair[:3]][0] if pair[:3] in METALS else LOT
+
+
+def is_metal(pair: str) -> bool:
+    return pair[:3] in METALS
 DEFAULTS = {
     "account_size": 10000, "account_currency": "USD", "risk_pct": 1.0,
     "max_loss_per_trade": None, "max_leverage": 30, "min_reward_risk": 1.5,
@@ -56,16 +70,22 @@ class FxError(Exception):
 
 def norm_pair(s: str) -> str:
     p = s.upper().replace("/", "").replace("_", "").replace("-", "").replace("=X", "").strip()
-    if len(p) != 6 or p[:3] not in CURRENCIES or p[3:] not in CURRENCIES or p[:3] == p[3:]:
-        raise FxError(f"not a currency pair: {s!r} (use e.g. EURUSD or EUR/USD)")
+    p = {"GOLD": "XAUUSD", "SILVER": "XAGUSD", "XAU": "XAUUSD", "XAG": "XAGUSD"}.get(p, p)
+    base_ok = p[:3] in CURRENCIES or p[:3] in METALS
+    if len(p) != 6 or not base_ok or p[3:] not in CURRENCIES or p[:3] == p[3:]:
+        raise FxError(f"not a currency pair: {s!r} (use e.g. EURUSD, EUR/USD or XAUUSD)")
     return p
 
 
 def pip_size(pair: str) -> float:
+    if is_metal(pair):
+        return METALS[pair[:3]][1]
     return 0.01 if pair[3:] == "JPY" else 0.0001
 
 
 def decimals(pair: str) -> int:
+    if is_metal(pair):
+        return METALS[pair[:3]][2]
     return 3 if pair[3:] == "JPY" else 5
 
 
@@ -99,7 +119,8 @@ def _yahoo(pair: str, rng: str, offline: str | None) -> dict:
         last = None
         for host in ("query2.finance.yahoo.com", "query1.finance.yahoo.com"):
             try:
-                text = _get(f"https://{host}/v8/finance/chart/{pair}=X?range={rng}&interval=1d")
+                sym = METALS[pair[:3]][3] if is_metal(pair) and pair[3:] == "USD" else f"{pair}=X"
+                text = _get(f"https://{host}/v8/finance/chart/{sym}?range={rng}&interval=1d")
                 break
             except FxError as e:
                 last = e
@@ -152,7 +173,10 @@ def get_pair(pair: str, offline: str | None = None, rng: str = "6mo", source: st
     if key in _cache:
         return _cache[key]
     errors = []
-    order = ["yahoo", "stooq"] if source == "auto" else [source]
+    if source != "auto":
+        order = [source]
+    else:
+        order = ["stooq", "yahoo"] if is_metal(pair) else ["yahoo", "stooq"]
     for src in order:
         try:
             d = _yahoo(pair, rng, offline) if src == "yahoo" else _stooq(pair, offline)
@@ -255,6 +279,7 @@ def cmd_quote(a) -> int:
         if d["prev_close"]:
             chg = (d["price"] - d["prev_close"]) / pip_size(p)
         out.append({"pair": p, "price": d["price"], "prev_close": d["prev_close"],
+                    "note": "futures, not spot" if is_metal(p) and d["source"] == "yahoo" else None,
                     "change_pips": None if chg is None else round(chg, 1),
                     "source": d["source"], "time": d["time"]})
     if a.write:
@@ -270,7 +295,8 @@ def cmd_quote(a) -> int:
                 continue
             p = r["pair"]
             ch = "" if r["change_pips"] is None else f"  {r['change_pips']:+.1f} pips vs prev close"
-            print(f"  {p[:3]}/{p[3:]}  {fmt(p, r['price'])}{ch}  ({r['source']})")
+            note = f", {r['note']}" if r.get("note") else ""
+            print(f"  {p[:3]}/{p[3:]}  {fmt(p, r['price'])}{ch}  ({r['source']}{note})")
         print("Indicative mid rates, delayed. Your broker's bid/ask is what fills.")
         if a.write:
             print(f"Wrote {a.write}")
@@ -281,7 +307,7 @@ def cmd_quote(a) -> int:
 
 def pip_value_per_lot(pair: str, account: str, price: float | None, offline: str | None) -> float:
     """Value of one pip on one standard lot, in the account currency."""
-    pv_quote = LOT * pip_size(pair)  # in the quote currency
+    pv_quote = contract(pair) * pip_size(pair)  # in the quote currency
     quote = pair[3:]
     if quote == account:
         return pv_quote
@@ -388,7 +414,7 @@ def cmd_size(a) -> int:
         base_in_acct = plan["entry"]
     else:
         base_in_acct = rate(p[:3], acct, a.offline)
-    notional_per_lot = LOT * base_in_acct
+    notional_per_lot = contract(p) * base_in_acct
     lots_lev = math.floor(account * cfg["max_leverage"] / notional_per_lot / step + 1e-9) * step
     lots = min(lots_risk, lots_lev, cfg["max_lots"])
     binds = "max loss" if lots == lots_risk else ("leverage" if lots == lots_lev else "max lots")
@@ -407,10 +433,11 @@ def cmd_size(a) -> int:
         print(f"Size: 0 lots. The stop is too wide for a {max_loss:,.2f} {acct} max loss even at "
               f"{step} lots. Tighten the stop or raise the risk.")
         return 1
-    print(f"Size: {lots:.2f} lots = {int(lots * LOT):,} units  (limit: {binds})")
+    unit_name = "oz" if is_metal(p) else "units"
+    print(f"Size: {lots:.2f} lots = {int(round(lots * contract(p))):,} {unit_name}  (limit: {binds})")
     print(f"  Loss at stop  {loss:,.2f} {acct}    Gain at target {gain:,.2f} {acct}    "
           f"Margin ~{margin:,.2f} {acct} at {cfg['max_leverage']}:1")
-    order = {"pair": p, "side": plan["side"], "units": int(lots * LOT), "lots": lots,
+    order = {"pair": p, "side": plan["side"], "units": int(round(lots * contract(p))), "lots": lots,
              "type": "market", "stop_loss": plan["stop"], "take_profit": plan["target"],
              "max_loss": round(loss, 2), "account_currency": acct}
     if a.write:
@@ -484,7 +511,7 @@ def analyse(pair: str, bars: list[dict]) -> dict:
 
 
 def cmd_scan(a) -> int:
-    pairs = [norm_pair(x) for x in (a.pairs.split(",") if a.pairs else MAJORS + CROSSES)]
+    pairs = [norm_pair(x) for x in (a.pairs.split(",") if a.pairs else MAJORS + CROSSES + ["XAUUSD"])]
     rows, errs = [], []
     for p in pairs:
         try:

@@ -15,6 +15,17 @@ python jarvis.py "is the market open?"  # one question
 Examples: "is the market open?", "scan TSLA, NVDA and AMD for setups", "any news on my
 watchlist?", "how did Apple's last quarter look?", "what has Pelosi filed lately?".
 
+## Voice
+
+```bash
+pip install -r requirements-voice.txt   # macOS: brew install portaudio first; Linux: apt install portaudio19-dev espeak-ng
+python jarvis.py --voice
+```
+
+Press Enter on an empty line to talk; JARVIS speaks a short version of each answer.
+`/voice on` / `/voice off` toggle it. Speech recognition uses Google's free web recognizer.
+Orders are never confirmed by voice: `/fxsend` always needs a typed yes.
+
 ## Forex
 
 JARVIS trades currency pairs too, through the `trader-forex` skill
@@ -28,6 +39,11 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
 - **Plans:** long *or short*, stop and target as prices, pips or R; warns on tight stops and low reward:risk.
 - **Lot sizing:** from your account size and risk %, capped by leverage (default 30:1) and max lots.
 - **Scanner:** majors and crosses for trend, 20-day breakouts, RSI and ATR in pips.
+
+- **Gold and silver:** XAUUSD / XAGUSD ("price of gold", "buy gold at 2650 stop 2635").
+- **OANDA:** read your demo account and positions, and send a planned order with `/fxsend`
+  (risk-checked, and only after you type yes). Practice account by default; live needs
+  `OANDA_ALLOW_LIVE=1`. Set `OANDA_API_TOKEN` and `OANDA_ACCOUNT_ID` in your shell.
 
 Try: "is forex open?", "price of EURUSD and cable", "scan the forex majors",
 "plan EURUSD buy at 1.0850 stop 1.0820 target 2R", "short GBPJPY stop 40 pips target 80 pips",
