@@ -41,9 +41,14 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
 - **Scanner:** majors and crosses for trend, 20-day breakouts, RSI and ATR in pips.
 
 - **Gold and silver:** XAUUSD / XAGUSD ("price of gold", "buy gold at 2650 stop 2635").
-- **OANDA:** read your demo account and positions, and send a planned order with `/fxsend`
-  (risk-checked, and only after you type yes). Practice account by default; live needs
-  `OANDA_ALLOW_LIVE=1`. Set `OANDA_API_TOKEN` and `OANDA_ACCOUNT_ID` in your shell.
+- **STARTRADER (MetaTrader 5):** read your account and positions ("my STARTRADER account"),
+  and send a planned order with `/fxsend`: risk-checked against your real balance and the
+  broker's live price, then sent only after you type yes, with stop-loss and take-profit
+  attached. Needs **Windows** with the STARTRADER MT5 terminal installed and logged in
+  (`pip install -r requirements.txt` installs the `MetaTrader5` package there). Real-money
+  accounts are blocked unless `MT5_ALLOW_LIVE=1`; start on a demo account.
+  Works with any MT5 broker. Use OANDA instead with `JARVIS_FX_BROKER=oanda`
+  (`OANDA_API_TOKEN`, `OANDA_ACCOUNT_ID`).
 
 Try: "is forex open?", "price of EURUSD and cable", "scan the forex majors",
 "plan EURUSD buy at 1.0850 stop 1.0820 target 2R", "short GBPJPY stop 40 pips target 80 pips",

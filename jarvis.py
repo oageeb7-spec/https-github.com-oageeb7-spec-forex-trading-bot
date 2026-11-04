@@ -36,6 +36,11 @@ EFFORT = os.environ.get("JARVIS_EFFORT", "medium")
 TOOL_TIMEOUT = int(os.environ.get("JARVIS_TOOL_TIMEOUT", "300"))
 MAX_OUTPUT_CHARS = 30_000
 
+# Forex broker: "mt5" = MetaTrader 5 (STARTRADER and other MT5 brokers, Windows), "oanda" = OANDA.
+FX_BROKER = os.environ.get("JARVIS_FX_BROKER", "mt5").lower()
+FX_BROKER_SCRIPT = "trader-forex/oanda.py" if FX_BROKER == "oanda" else "trader-forex/mt5.py"
+FX_BROKER_NAME = "OANDA" if FX_BROKER == "oanda" else "STARTRADER via MetaTrader 5"
+
 # tool name -> (script, allowed subcommands or None for scripts without
 # subcommands, description for Claude)
 TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
@@ -122,11 +127,13 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "(default: majors and crosses). Gold and silver work as XAUUSD and XAGUSD.",
     ),
     "fxbroker": (
-        "trader-forex/oanda.py",
-        {"account", "positions", "check", "preview"},
-        "OANDA forex broker, READ ONLY from here: `account` = balance and margin; "
+        FX_BROKER_SCRIPT,
+        {"account", "positions", "check", "preview"} | ({"symbol"} if FX_BROKER == "mt5" else set()),
+        f"Forex broker ({FX_BROKER_NAME}), READ ONLY from here: `account` = balance, equity, margin; "
         "`positions` = open positions; `check [--index 1]` = risk-check the proposed order in "
-        "trader/fx_orders.json; `preview` = the exact order JSON. Sending is NOT available to you: "
+        "trader/fx_orders.json against the broker's live price and contract size; `preview` = the "
+        "exact order" + ("; `symbol EURUSD` = the broker's symbol name and contract details"
+                         if FX_BROKER == "mt5" else "") + ". Sending is NOT available to you: "
         "the user types /fxsend in JARVIS and confirms with their own yes.",
     ),
 }
@@ -460,13 +467,15 @@ def fx_numbers(text: str) -> list[float]:
 
 def route_forex(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | str:
     t = text.lower()
-    if has(t, "oanda", "broker", "my account", "balance", "margin", "positions", "send", "place", "execute"):
+    if has(t, "oanda", "startrader", "star trader", "mt5", "metatrader", "meta trader",
+           "broker", "my account", "balance", "margin", "positions", "send", "place", "execute"):
         if has(t, "position"):
             return [("fxbroker", ["positions"])]
         if has(t, "account", "balance", "margin"):
             return [("fxbroker", ["account"])]
         return [("fxbroker", ["check"]),
-                ("_say", ["To send it to OANDA, type /fxsend - you'll see the ticket and confirm with your own yes."])]
+                ("_say", [f"To send it to {FX_BROKER_NAME}, type /fxsend - you'll see the ticket and "
+                          "confirm with your own yes."])]
     if has(t, "open", "session", "clock", "closed", "hours", "weekend") and not has(t, "plan", "trade", "lots"):
         return [("forex", ["clock"])]
     if has(t, "scan", "setup", "breakout", "breaking", "trend", "oversold", "overbought", "which pair", "what pair", "movers"):
@@ -518,7 +527,8 @@ def route(text: str) -> list[tuple[str, list[str]]] | str:
     """Map a plain-English request to tool runs, or return a reply string."""
     t = text.lower()
     pairs = find_pairs(text)
-    if pairs or has(t, "forex", "\\bfx\\b", "currenc", "oanda", "\\bpips?\\b", "how many lots", "lot size"):
+    if pairs or has(t, "forex", "\\bfx\\b", "currenc", "oanda", "startrader", "star trader",
+                    "\\bmt5", "metatrader", "meta trader", "send .*broker", "send .*order", "forex order", "\\bpips?\\b", "how many lots", "lot size"):
         if not has(t, "set ", "change ", "update ", "my rules", "settings"):
             return route_forex(text, pairs)
     tickers = find_tickers(text)
@@ -638,12 +648,12 @@ Forex:
   short GBPJPY stop 40 pips target 80 pips    how many lots, 1% risk
   set forex account to 25000     set leverage to 50
   price of gold                  buy gold at 2650 stop 2635 target 2R
-  my OANDA account               my forex positions
+  my STARTRADER account          my forex positions
 
 Commands:
   /run <tool> <args>   run a skill script directly, e.g. /run alerts clock
   /tools               list tools        /local  /claude   switch brain
-  /fxsend [n]          send proposed forex order n to OANDA (asks for your yes)
+  /fxsend [n]          send proposed forex order n to your broker (asks for your yes)
   /voice on|off        speak answers aloud; Enter on an empty line to talk
   /reset               forget the chat   /help   /quit"""
 
@@ -724,16 +734,16 @@ def speakable(text: str, limit: int = 320) -> str:
 
 def fx_send(index: int, ask=input) -> None:
     """Show the ticket, risk-check it, and send only on the user's typed yes."""
-    oanda = [sys.executable, str(SKILLS / "trader-forex" / "oanda.py")]
+    oanda = [sys.executable, str(SKILLS / FX_BROKER_SCRIPT)]
     chk = subprocess.run([*oanda, "check", "--index", str(index)], cwd=ROOT,
                          capture_output=True, text=True)
     print((chk.stdout + chk.stderr).strip())
     if chk.returncode != 0:
         print("Not sent.")
         return
-    acct = os.environ.get("OANDA_ENV", "practice").upper()
+    where = f"OANDA {os.environ.get('OANDA_ENV', 'practice').upper()}" if FX_BROKER == "oanda" else "MetaTrader 5"
     try:
-        reply = ask(f"Send order {index} to OANDA {acct}? Type yes to send, anything else cancels: ").strip()
+        reply = ask(f"Send order {index} to {where}? Type yes to send, anything else cancels: ").strip()
     except (EOFError, KeyboardInterrupt):
         reply = ""
     if reply.lower() not in ("yes", "y", "yes send it", "send it", "confirm"):

@@ -1,1 +1,2 @@
 anthropic>=2.4.0
+MetaTrader5>=5.0.45; sys_platform == "win32"   # STARTRADER / MT5 broker connection (Windows only)

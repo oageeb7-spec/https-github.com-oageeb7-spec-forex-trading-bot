@@ -9,11 +9,12 @@ description: >-
   converted), plans a long or short trade with the stop and target in pips
   or R, sizes it in lots from your account and risk percent with a leverage
   cap, and scans the majors and crosses for trend, 20-day breakouts, RSI and
-  ATR in pips. Gold (XAUUSD) and silver (XAGUSD) too. Connects to an OANDA
-  practice (demo) account to read the balance and positions and, only after
-  a risk check and the user's own typed yes, send one bracket order. Use when the user says "forex", "FX",
+  ATR in pips. Gold (XAUUSD) and silver (XAGUSD) too. Connects to STARTRADER
+  (or any MetaTrader 5 broker) through the MT5 terminal, or to OANDA, to read
+  the balance and positions and, only after a risk check and the user's own
+  typed yes, send one order with stop-loss and take-profit. Use when the user says "forex", "FX",
   "EUR/USD", "cable", "how many lots", "pip value", "is forex open", "which
-  session", "scan the majors", "gold", "OANDA", "send my forex order", or names a currency pair.
+  session", "scan the majors", "gold", "STARTRADER", "MT5", "MetaTrader", "OANDA", "send my forex order", or names a currency pair.
 argument-hint: "[pair] [price]"
 ---
 
@@ -44,7 +45,32 @@ Prices come from Stooq spot; if Stooq fails, Yahoo's front-month futures
 (GC=F, SI=F) are used and marked "futures, not spot". Many regulators cap
 gold leverage at 20:1, lower than currencies; set `max_leverage` to match.
 
-## OANDA (sending orders)
+## STARTRADER / MetaTrader 5 (sending orders)
+
+STARTRADER (startrader.com, regulated by CMA, FSCA, FSA and FSC) trades through
+MetaTrader 5. Not to be confused with straderfx.com ("Strader Markets Group"), an
+unrelated company. `mt5.py` uses MetaQuotes' official `MetaTrader5` package, which
+only runs on **Windows** next to an installed, logged-in MT5 terminal.
+
+```bash
+pip install MetaTrader5
+# optional - otherwise the account the MT5 terminal is logged in to is used:
+set MT5_LOGIN=88001234 & set MT5_PASSWORD=... & set MT5_SERVER=<server name from MT5's login box>
+python3 "${CLAUDE_SKILL_DIR}/mt5.py" account          # balance, equity, margin, leverage
+python3 "${CLAUDE_SKILL_DIR}/mt5.py" positions
+python3 "${CLAUDE_SKILL_DIR}/mt5.py" symbol EURUSD    # broker's name (EURUSD+, GOLD, ...) and contract
+python3 "${CLAUDE_SKILL_DIR}/mt5.py" check            # risk check with live price + broker contract size
+python3 "${CLAUDE_SKILL_DIR}/mt5.py" preview          # the exact MT5 order request, nothing sent
+python3 "${CLAUDE_SKILL_DIR}/mt5.py" send --index 1 --confirm "yes"   # only on the user's own yes
+```
+
+`check` and `send` recompute the loss at the stop with the broker's own tick
+value and the live bid/ask, test it against `risk_pct` of the **real account
+balance**, block a price already past the stop or target, and run MT5's own
+`order_check`. A REAL account (not demo) also needs `MT5_ALLOW_LIVE=1`. Start on a
+STARTRADER demo account. Every attempt is logged in `trader/state/fx_broker.json`.
+
+## OANDA (alternative)
 
 ```bash
 export OANDA_API_TOKEN=...          # oanda.com -> Manage API Access (never paste into chat)
