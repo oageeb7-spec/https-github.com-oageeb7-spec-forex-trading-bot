@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@appdeploy/client": [".platform-shims/client.ts"],
+      "@appdeploy/sdk": [".platform-shims/sdk.ts"]
+    }
+  },
+  "include": ["../src", "../backend/index.ts", "../backend/analyze.ts", "../backend/market.ts"]
+}
