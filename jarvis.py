@@ -6,9 +6,11 @@ Talk to it in plain English ("is the market open?", "scan for breakouts",
 range low"). Claude decides which trader skill to run, runs the script in
 .claude/skills/, reads the output and answers.
 
-Safety: JARVIS never places, approves or records an order. The broker skill
-is limited to `show` (rendering tickets). Sending an order stays a manual
-step through trader-broker's three gates.
+Safety: for stocks, JARVIS never places, approves or records an order. The
+broker skill is limited to `show` (rendering tickets); sending stays a manual
+step through trader-broker's three gates. The one exception is forex `/fxsend`,
+which risk-checks a planned order and then sends it to MT5/OANDA on your typed
+`yes` (real-money forex is blocked unless MT5_ALLOW_LIVE=1).
 
 Without an API key it uses a built-in rule-based brain, so plain English
 still works for the common requests; /run <tool> <args...> runs any skill.

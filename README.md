@@ -56,6 +56,29 @@ Try: "is forex open?", "price of EURUSD and cable", "scan the forex majors",
 Forex rules live in the `forex` section of `trader/config.json`. Spread, swap and slippage are
 not included in the numbers, and nothing is ever placed.
 
+## Charts
+
+`charts.py` draws a candlestick chart with your own trade plan on it. It fetches the
+same free Yahoo bars the other tools use and overlays whatever the bot already worked
+out: entry / stop / target and the opening range from `trader/plan.json`, plus the
+scanner's setup label from `trader/watchlist.json`. It also draws a moving average
+(MA20 by default), a volume panel and the last price.
+
+The output is one self-contained `.html` file — open it in any browser. The chart is
+drawn by a small inline renderer with no external library, so it works fully offline.
+Standard library only, no pip install, no API key.
+
+```bash
+python3 charts.py TSLA                      # 5 days of 15-minute bars
+python3 charts.py EURUSD=X --range 1mo --interval 1h
+python3 charts.py NVDA --interval 5m --ma 50 --out trader/nvda.html
+python3 charts.py --plan                    # chart the symbol in trader/plan.json
+python3 charts.py TSLA --offline TSLA.json  # read a saved Yahoo chart JSON
+```
+
+The levels are your plan drawn on the price — a view, not a signal. The bars are free,
+delayed and unofficial, so don't trade off this chart alone.
+
 **No API key? It still works.** Without a key JARVIS uses a built-in rule-based brain that
 understands the common requests: market clock, quotes, news, scans, opening-range
 breakouts, entries, trade plans ("plan TSLA entry 364.20 stop 358 target 380"), the time
@@ -67,9 +90,13 @@ On first run JARVIS creates `trader/config.json` with starter rules ($5,000 budg
 loss a trade, paper trading). Say "show my rules", or "set budget to 10000" / "set max loss to 100".
 Set `sec_user_agent` in that file to your name and email for the SEC (news, earnings).
 
-**Safety:** JARVIS never places, approves or records orders. It can only *show* tickets;
-sending an order stays a manual step through `/trader-broker` in Claude Code.
-Data is free, delayed and unofficial. This is not financial advice.
+**Safety:** for **stocks**, JARVIS never places, approves or records orders — it only
+*shows* tickets; sending stays a manual step through `/trader-broker` in Claude Code.
+The one exception is **forex `/fxsend`**: it risk-checks the order against your real
+balance and the broker's live price, then sends it to MT5/OANDA after you type `yes`.
+Real-money forex is blocked unless `MT5_ALLOW_LIVE=1`, so you stay on a demo account
+until you deliberately turn that off. Data is free, delayed and unofficial. This is not
+financial advice.
 
 Settings (env vars): `JARVIS_OFFLINE=1` forces the built-in brain; `JARVIS_MODEL` (default `claude-opus-5-5`), `JARVIS_EFFORT`
 (default `medium`), `JARVIS_TOOL_TIMEOUT` seconds (default 300).
