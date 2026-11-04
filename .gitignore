@@ -1,3 +1,4 @@
 trader/
 __pycache__/
 .venv/
+graphify-out/cache/last_query_stamp
