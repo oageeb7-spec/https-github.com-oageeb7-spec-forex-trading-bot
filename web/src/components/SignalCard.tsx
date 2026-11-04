@@ -36,7 +36,7 @@ export default function SignalCard({ setup, analyzedAt, minRR, onSave, saving, s
   const hasLevels = s.entry != null && s.stop != null && s.tp1 != null;
 
   return (
-    <section aria-label="Signal" className="flex flex-col rounded-xl border border-white/10 bg-[#111725] p-4">
+    <section aria-label="Signal" className="flex flex-col rounded-2xl border border-white/10 bg-[#0f1520] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider text-slate-500">{pairLabel(p)} · {s.timeframe}</p>

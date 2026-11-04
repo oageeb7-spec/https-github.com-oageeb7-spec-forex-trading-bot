@@ -71,11 +71,11 @@ export default function Sizer({ pair, setup }: Props) {
   }
 
   return (
-    <section aria-label="Position sizer" className="rounded-xl border border-white/10 bg-[#111725] p-4">
-      <h2 className="flex items-center gap-2 text-base font-semibold text-slate-100">
+    <section aria-label="Position sizer">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
         <Calculator size={18} aria-hidden /> Position sizer
         <span className="text-xs font-normal text-slate-500">{pairLabel(pair)} · USD account</span>
-      </h2>
+      </h3>
       <form onSubmit={calculate} className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <label className="text-xs text-slate-400">Entry<input aria-label="Entry" className={field} inputMode="decimal" value={entry} onChange={edit(setEntry)} /></label>
         <label className="text-xs text-slate-400">Stop<input aria-label="Stop" className={field} inputMode="decimal" value={stop} onChange={edit(setStop)} /></label>

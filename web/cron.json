@@ -1,0 +1,8 @@
+[
+  {
+    "name": "scan-markets",
+    "cron": "*/15 * * * *",
+    "handler": "scanMarkets",
+    "timezone": "UTC"
+  }
+]

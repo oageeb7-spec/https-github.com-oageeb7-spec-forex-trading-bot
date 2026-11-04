@@ -26,7 +26,7 @@ export type Clock = { open: boolean; sessions: string[]; overlap: boolean; newYo
 /** [time, open, high, low, close, volume] */
 export type BarRow = [number, number, number, number, number, number];
 
-export type Analysis = { setup: Setup; bars: BarRow[]; clock: Clock; analyzedAt: number };
+export type Analysis = { setup: Setup; bars: BarRow[]; clock: Clock; analyzedAt: number; review: DeskReview | null };
 
 export type Live = {
   status: string;
@@ -39,7 +39,11 @@ export type Live = {
   openPips?: number;
 };
 
-export type Signal = Setup & { id: string; minRR: number; createdAt: number; live: Live | null };
+export type Signal = Setup & {
+  id: string; minRR: number; createdAt: number; live: Live | null;
+  source?: 'manual' | 'scanner'; outcome?: string; realizedR?: number; closedAt?: number;
+  desk: { final: 'take' | 'skip'; confidence: number } | null;
+};
 
 export type SizeResult = {
   pair: string; side: string; lots: number; units: number; unitName: string; limit: string;
@@ -48,3 +52,55 @@ export type SizeResult = {
 };
 
 export type Level = { price: number; color: string; title: string };
+
+export type ToolCall = { name: string; args: string };
+
+export type AgentReport = {
+  agent: 'analyst' | 'risk' | 'head';
+  title: string;
+  status: 'done' | 'skipped' | 'failed';
+  verdict: string;
+  confidence: number | null;
+  points: string[];
+  concerns: string[];
+  tools: ToolCall[];
+  ms: number;
+};
+
+export type DeskReview = {
+  id: string;
+  pair: string;
+  timeframe: string;
+  analyst: AgentReport;
+  risk: AgentReport;
+  head: AgentReport;
+  final: 'take' | 'skip';
+  confidence: number;
+  summary: string;
+  guardrails: string[];
+  createdAt: number;
+};
+
+export type FeedEvent = {
+  at: number;
+  agent: 'scanner' | 'analyst' | 'risk' | 'head' | 'tracker' | 'desk';
+  text: string;
+  pair?: string;
+  tf?: string;
+  tone?: 'good' | 'bad' | 'info' | 'warn';
+};
+
+export type ScannerDoc = {
+  lastRun: number; trigger: string; scanned: number; found: number; reviewed: number; closed: number;
+  errors: number; note: string; ms: number; setups: string[];
+};
+
+export type Meta = {
+  pairs: string[]; timeframes: string[]; clock: Clock; scanner: ScannerDoc | null;
+  watchlist: string[]; scanTimeframes: string[]; agentBudget: { used: number; cap: number };
+};
+
+export type Performance = {
+  closed: number; targetHit: number; stopped: number; stoppedAfterTp1: number; missed: number; rSum: number;
+  winRate: number | null; avgR: number | null; note: string;
+};

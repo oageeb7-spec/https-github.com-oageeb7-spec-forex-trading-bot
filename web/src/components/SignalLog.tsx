@@ -24,6 +24,11 @@ const STATUS_TONE: Record<string, string> = {
 
 function status(s: Signal): { text: string; tone: string } {
   if (s.decision !== 'trade') return { text: 'no trade', tone: 'bg-slate-500/10 text-slate-400' };
+  if (s.outcome) {
+    const r = s.realizedR ?? 0;
+    const tail = s.outcome === 'missed' ? '' : ` ${r > 0 ? '+' : ''}${r}R`;
+    return { text: `closed: ${s.outcome}${tail}`, tone: STATUS_TONE[s.outcome] || 'bg-slate-500/15 text-slate-300' };
+  }
   if (!s.live) return { text: 'no live data', tone: 'bg-slate-500/10 text-slate-400' };
   return { text: s.live.status, tone: STATUS_TONE[s.live.status] || 'bg-slate-500/15 text-slate-300' };
 }
@@ -43,9 +48,9 @@ export default function SignalLog({ signals, loading, error, checkedAt, onRefres
   }
 
   return (
-    <section aria-label="Signal log" className="rounded-xl border border-white/10 bg-[#111725] p-4">
+    <section aria-label="Signal log">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-slate-100">Signal log</h2>
+        <h3 className="text-sm font-semibold text-white">Signal log</h3>
         <div className="flex items-center gap-3 text-xs text-slate-500">
           {checkedAt && <span>checked {timeAgo(checkedAt)}</span>}
           <button type="button" onClick={onRefresh} disabled={loading} aria-label="Refresh signal log"
@@ -54,7 +59,7 @@ export default function SignalLog({ signals, loading, error, checkedAt, onRefres
           </button>
         </div>
       </div>
-      <p className="mt-1 text-xs text-slate-500">Saved readings, re-checked against live prices: pending, open, TP1, target, stopped.</p>
+      <p className="mt-1 text-xs text-slate-500">Readings saved by you or logged by the scanner, re-checked against live prices until they close.</p>
       {error && <p role="alert" className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
       {!error && !signals.length && !loading && (
         <p className="mt-4 text-sm text-slate-500">No saved signals yet. Analyze a pair and press "Save to signal log".</p>
@@ -72,6 +77,14 @@ export default function SignalLog({ signals, loading, error, checkedAt, onRefres
                   <span className={`text-xs font-bold ${s.side === 'buy' ? 'text-emerald-300' : s.side === 'sell' ? 'text-rose-300' : 'text-slate-400'}`}>
                     {s.decision === 'trade' ? s.side?.toUpperCase() : 'NO TRADE'}
                   </span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${s.source === 'scanner' ? 'bg-sky-500/10 text-sky-300' : 'bg-white/5 text-slate-400'}`}>
+                    {s.source === 'scanner' ? 'Scanner' : 'You'}
+                  </span>
+                  {s.desk && (
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${s.desk.final === 'take' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-slate-500/15 text-slate-300'}`}>
+                      Desk {s.desk.final}{s.desk.final === 'take' ? ` ${s.desk.confidence}%` : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.tone}`}>{st.text}</span>

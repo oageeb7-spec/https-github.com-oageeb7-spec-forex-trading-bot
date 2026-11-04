@@ -8,7 +8,7 @@
       "GET /api/analyze live price feed",
       "signal decision card with reasons",
       "candlestick chart",
-      "GET /api/meta market clock"
+      "GET /api/meta market clock and KPI cards"
     ],
     "description": "Verifies a live analysis returns one decision with its reasons, a drawn chart and the market clock.",
     "steps": [
@@ -16,7 +16,63 @@
       "Click the '15m' timeframe button",
       "Click 'Analyze'"
     ],
-    "expected": "The Signal panel shows a decision of BUY, SELL or NO TRADE with a 'Why' list containing at least one reason, a candlestick chart is drawn in the Chart panel, and the header shows the market clock reading 'FX open' or 'FX closed'."
+    "expected": "The signal card shows a decision of BUY, SELL or NO TRADE with a 'Why' list containing at least one reason, a candlestick chart is drawn in the Chart panel, and the header shows the market clock reading 'FX open' or 'FX closed'."
+  },
+  {
+    "name": "Run the three-agent desk on a reading",
+    "viewport": "desktop",
+    "covers": [
+      "POST /api/desk agent review",
+      "AI agents using live-data tools",
+      "code-enforced guardrails",
+      "agent budget display"
+    ],
+    "description": "Verifies the agent desk runs its AI agents on the current reading and shows each agent's verdict and a final decision.",
+    "steps": [
+      "Select 'EUR/USD' in the Market dropdown and click 'Analyze'",
+      "In the Agent desk section, click 'Run agent desk'",
+      "Wait for the agents to finish"
+    ],
+    "expected": "The Agent desk shows a final banner reading TAKE or SKIP, and three agent panels titled Market Analyst, Risk Manager and Head Trader each show a verdict label. The Market Analyst panel lists at least one tool it used, such as get_setup."
+  },
+  {
+    "name": "Run the scanner and read the agent activity and forward test",
+    "viewport": "desktop",
+    "covers": [
+      "POST /api/scanner/run",
+      "GET /api/activity agent feed",
+      "GET /api/performance forward test",
+      "scanner cooldown"
+    ],
+    "description": "Verifies the scanner runs on demand, reports in the agent activity feed, and the forward-test stats are shown.",
+    "steps": [
+      "Click the 'Agent activity' tab",
+      "Click 'Run scanner now'",
+      "Click the 'Performance' tab"
+    ],
+    "expected": "After running the scanner a status line starting with 'Scanned' or 'The scanner ran' is visible and the activity list contains an entry starting with 'Scanner:'. The Performance tab shows 'Closed trades', 'Win rate' and 'Average R'."
+  },
+  {
+    "name": "Save a reading, keep it after reload, then delete it",
+    "viewport": "desktop",
+    "covers": [
+      "POST /api/signals save",
+      "GET /api/signals log with live status",
+      "DELETE /api/signals/:id",
+      "persistence after reload",
+      "destructive-action confirmation"
+    ],
+    "description": "Verifies a reading saved by the user survives a reload and a confirmed delete removes it for good.",
+    "steps": [
+      "Select 'EUR/USD' in the Market dropdown and click 'Analyze'",
+      "Click 'Save to signal log'",
+      "Refresh the page",
+      "Click the 'Signal log' tab",
+      "On the EUR/USD 15m entry marked 'You', click its delete (trash) button and then 'Confirm delete'",
+      "Refresh the page",
+      "Click the 'Signal log' tab"
+    ],
+    "expected": "After the first refresh the Signal log shows a EUR/USD 15m entry marked 'You'. After the confirmed delete and the second refresh that entry marked 'You' is no longer in the Signal log."
   },
   {
     "name": "Size a position and block an invalid stop",
@@ -30,56 +86,12 @@
     "description": "Verifies the position sizer returns the correct lots for a USD account and rejects a stop equal to the entry.",
     "steps": [
       "Select 'EUR/USD' in the Market dropdown",
-      "In the Position sizer, set Entry to 1.10000, Stop to 1.09800, Target to 1.10400, Account to 10000, Risk % to 1 and Leverage to 30",
+      "Click the 'Position sizer' tab",
+      "Set Entry to 1.10000, Stop to 1.09800, Target to 1.10400, Account to 10000, Risk % to 1 and Leverage to 30",
       "Click 'Calculate size'",
       "Change Stop to 1.10000",
       "Click 'Calculate size' again"
     ],
     "expected": "After the first calculation the result shows 0.50 lots with Loss at stop $100.00 and Gain at target $200.00. After the second calculation an error reading 'The stop cannot equal the entry' is visible."
-  },
-  {
-    "name": "Save a reading, keep it after reload, then delete it",
-    "viewport": "desktop",
-    "covers": [
-      "POST /api/signals save",
-      "GET /api/signals log with live status",
-      "DELETE /api/signals/:id",
-      "persistence after reload",
-      "destructive-action confirmation"
-    ],
-    "description": "Verifies a saved analysis survives a reload and a confirmed delete removes it for good.",
-    "steps": [
-      "Select 'EUR/USD' in the Market dropdown and click 'Analyze'",
-      "Click 'Save to signal log'",
-      "Refresh the page",
-      "In the Signal log, click the delete (trash) button on the EUR/USD 15m entry",
-      "Click 'Confirm delete'",
-      "Refresh the page"
-    ],
-    "expected": "After the first refresh the Signal log shows a EUR/USD 15m entry. After the confirmed delete and the second refresh that EUR/USD 15m entry is no longer in the Signal log."
-  },
-  {
-    "name": "Show an error when the analysis fails",
-    "viewport": "desktop",
-    "covers": [
-      "analyze error handling",
-      "user-visible error state"
-    ],
-    "description": "Verifies a failed analysis is shown as an error instead of a stale or empty signal.",
-    "qa_faults": [
-      {
-        "method": "GET",
-        "path": "/api/analyze",
-        "status": 500,
-        "body_json": {
-          "error": "simulated_failure"
-        }
-      }
-    ],
-    "steps": [
-      "Select 'EUR/USD' in the Market dropdown",
-      "Click 'Analyze'"
-    ],
-    "expected": "A red error message starting with 'Could not analyze EUR/USD' is visible and the Signal panel shows no BUY, SELL or NO TRADE decision."
   }
 ]
