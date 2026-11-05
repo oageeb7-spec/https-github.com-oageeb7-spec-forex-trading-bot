@@ -1,6 +1,6 @@
 // Setup finder: a TypeScript port of .claude/skills/trader-forex/setup.py.
 // Same rules, same thresholds - web/backend/parity.test.ts checks both give the
-// same answer on the saved real EURUSD and gold bars.
+// same answer on the saved real EURUSD, gold and BTC bars.
 //
 // Reads swings, structure, the latest break of structure, liquidity sweeps and
 // premium/discount; enters from the latest unfilled fair-value gap (else the order
@@ -8,7 +8,7 @@
 // TP1/TP2 at the next resting liquidity. A trade needs a clear score lead and
 // reward:risk >= minRR, otherwise No Trade with the reason.
 
-import { Bar, decimals, fmt, isMetal, pipSize, roundTo } from './market';
+import { Bar, decimals, fmt, isCrypto, isMetal, pipSize, roundTo } from './market';
 
 const SWEEP_LOOKBACK = 30;
 const ZONE_LOOKBACK = 60;
@@ -269,7 +269,8 @@ export function analyze(pair: string, bars: Bar[], swing: number, minRR: number,
     where = prot.length ? 'the zone and the last swing high' : 'the zone';
   }
   let risk = Math.abs(entry - stop);
-  const minStop = isMetal(p) ? 20 * ps : 5 * ps;
+  // 5 pips on FX, 20 ($2) on metals, 0.1% of the price on crypto - same as setup.py
+  const minStop = isCrypto(p) ? Math.ceil((entry * 0.001) / ps) * ps : isMetal(p) ? 20 * ps : 5 * ps;
   if (risk < minStop) {
     stop = entry - sgn * minStop;
     risk = minStop;

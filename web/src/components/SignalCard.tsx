@@ -1,6 +1,6 @@
 import { Save, TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import type { Setup } from '../lib/types';
-import { pairLabel, price, timeAgo } from '../lib/format';
+import { pairLabel, price, signedPips, timeAgo } from '../lib/format';
 
 type Props = {
   setup: Setup;
@@ -54,10 +54,10 @@ export default function SignalCard({ setup, analyzedAt, minRR, onSave, saving, s
       {trade && hasLevels && (
         <div className="mt-4">
           <Row label={`Entry (${s.entryType})`} value={price(p, s.entry)} tone="text-blue-300" />
-          <Row label="Stop loss" value={price(p, s.stop)} sub={`-${s.stopPips} pips`} tone="text-rose-300" />
-          <Row label="Take profit 1" value={price(p, s.tp1)} sub={`+${s.tp1Pips} pips · ${s.rrTp1}R`} tone="text-emerald-300" />
+          <Row label="Stop loss" value={price(p, s.stop)} sub={signedPips(-(s.stopPips ?? 0), p)} tone="text-rose-300" />
+          <Row label="Take profit 1" value={price(p, s.tp1)} sub={`${signedPips(s.tp1Pips, p)} · ${s.rrTp1}R`} tone="text-emerald-300" />
           {s.tp2 != null && (
-            <Row label="Take profit 2" value={price(p, s.tp2)} sub={`+${s.tp2Pips} pips · ${s.rr}R`} tone="text-teal-300" />
+            <Row label="Take profit 2" value={price(p, s.tp2)} sub={`${signedPips(s.tp2Pips, p)} · ${s.rr}R`} tone="text-teal-300" />
           )}
           <div className="mt-3 flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
             <span className="text-sm text-slate-400">Reward : risk</span>

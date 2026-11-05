@@ -114,9 +114,9 @@ export default function SignalLog({ signals, loading, error, checkedAt, onRefres
                   {s.live && (
                     <>
                       <span>Now <span className="text-slate-200">{price(p, s.live.price)}</span></span>
-                      <span>P/L {s.live.openPips != null ? signedPips(s.live.openPips) : 'not filled'}</span>
-                      <span>to TP1 {signedPips(s.live.toTp1Pips)}</span>
-                      <span>to SL {signedPips(s.live.toStopPips)}</span>
+                      <span>P/L {s.live.openPips != null ? signedPips(s.live.openPips, p) : 'not filled'}</span>
+                      <span>to TP1 {signedPips(s.live.toTp1Pips, p)}</span>
+                      <span>to SL {signedPips(s.live.toStopPips, p)}</span>
                     </>
                   )}
                 </div>

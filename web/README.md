@@ -4,7 +4,7 @@ Live: https://os-ai-trading-wg0h27.v2.appdeploy.ai/ (AppDeploy app `os-ai-tradin
 
 A web version of the trader-forex setup finder with a team of AI agents.
 
-**Engine.** Pick a market (EUR/USD, gold, the majors, a few crosses, silver) and a
+**Engine.** Pick a market (EUR/USD, gold, BTC/USD, the majors, a few crosses, silver) and a
 timeframe; the server pulls live delayed Yahoo bars and the rules engine reads
 structure, breaks of structure, liquidity sweeps, premium/discount and fair-value gaps /
 order blocks, then returns one decision: BUY or SELL with entry, stop, TP1, TP2, pips and
@@ -17,7 +17,7 @@ reward:risk plus the reasons, or NO TRADE when reward:risk is under your minimum
 | Market Analyst | checks other timeframes and price action against the engine's reading | `get_setup`, `get_price_action` |
 | Risk Manager | sizes the trade, checks the stop vs ATR and the session; pass, caution or veto | `size_position`, `get_volatility`, `get_session` |
 | Head Trader | reads both reports, decides TAKE or SKIP with confidence and a plan | - |
-| Scanner (cron, every 15 min) | reads EUR/USD, gold, GBP/USD, USD/JPY on 15m and 1h, logs new setups, sends the newest to the desk | engine |
+| Scanner (cron, every 15 min) | reads EUR/USD, gold, BTC/USD, GBP/USD, USD/JPY on 15m and 1h (BTC only at weekends, when FX is closed), logs new setups, sends the newest to the desk | engine |
 | Tracker (same cron) | closes logged trades at target or stop and counts them in the forward test | engine |
 
 Guardrails are code, not prompts: agents never set prices (levels come from the engine);

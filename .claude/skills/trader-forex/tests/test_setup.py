@@ -203,5 +203,46 @@ class TrackTest(unittest.TestCase):
         self.assertEqual(t["bars_since"], 1)
 
 
+class BitcoinTest(unittest.TestCase):
+    """BTCUSD on real Yahoo BTC-USD 15-minute bars (fixtures/BTCUSD_15m.json)."""
+
+    def bars(self):
+        with open(os.path.join(HERE, "fixtures", "BTCUSD_15m.json")) as f:
+            return setup.parse_chart(f.read())
+
+    def test_pair_names_and_pip_maths(self):
+        from fx import FxError, contract, decimals, norm_pair, pip_size
+        for raw in ("BTCUSD", "btc/usd", "bitcoin", "BTC", "XBTUSD"):
+            self.assertEqual(norm_pair(raw), "BTCUSD")
+        with self.assertRaises(FxError):
+            norm_pair("BTCEUR")                     # crypto is USD-quoted only
+        self.assertEqual((pip_size("BTCUSD"), decimals("BTCUSD"), contract("BTCUSD")), (1.0, 2, 1))
+        self.assertEqual(setup.yahoo_symbol("BTCUSD"), "BTC-USD")
+
+    def test_real_btc_sell_limit(self):
+        s = setup.analyze("BTCUSD", self.bars(), 3, 2.0, "15m")
+        self.assertEqual((s["decision"], s["side"], s["entry_type"]), ("trade", "sell", "limit"))
+        self.assertGreater(s["stop"], s["entry"])
+        self.assertGreater(s["entry"], s["price"])  # a sell limit waits above price
+        self.assertGreater(s["entry"], s["tp1"])
+        self.assertGreater(s["tp1"], s["tp2"])
+        self.assertEqual((s["entry"], s["stop"], s["tp1"], s["tp2"]), (80431.29, 80656.9, 80146.98, 79856.55))
+        self.assertAlmostEqual(s["stop_pips"], s["stop"] - s["entry"], places=1)   # 1 pip = $1
+        self.assertAlmostEqual(s["rr"], 2.55, places=2)
+
+    def test_exact_halves_round_away_from_zero_like_the_web_app(self):
+        # 295.25 is exact in binary; Python's round() would give 295.2, JavaScript 295.3
+        self.assertEqual(setup.rnd(295.25, 1), 295.3)
+        self.assertEqual(setup.rnd(-295.25, 1), -295.3)
+        self.assertEqual(setup.rnd(0.15, 1), 0.1)      # 0.15 is really 0.1499..., so no tie
+        self.assertEqual(setup.rnd(1.123345, 5), round(1.123345, 5))
+
+    def test_crypto_minimum_stop_scales_with_price(self):
+        self.assertAlmostEqual(setup.min_stop_distance("BTCUSD", 80000.0), 80.0)       # 0.1%
+        self.assertAlmostEqual(setup.min_stop_distance("BTCUSD", 80001.0), 81.0)       # rounded up to a whole pip
+        self.assertAlmostEqual(setup.min_stop_distance("EURUSD", 1.1), 0.0005)
+        self.assertAlmostEqual(setup.min_stop_distance("XAUUSD", 4000.0), 2.0)
+
+
 if __name__ == "__main__":
     unittest.main()

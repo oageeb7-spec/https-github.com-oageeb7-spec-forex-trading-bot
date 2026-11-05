@@ -11,10 +11,15 @@ const METALS: Record<string, Metal> = {
   XAG: { contract: 5000, pip: 0.01, dec: 3, future: 'SI=F' },
 };
 
+// crypto, USD-quoted only. Broker convention: 1 lot = 1 coin, 1 pip = $1. Trades 24/7.
+const CRYPTO: Record<string, { contract: number; pip: number; dec: number; symbol: string }> = {
+  BTC: { contract: 1, pip: 1, dec: 2, symbol: 'BTC-USD' },
+};
+
 const CURRENCIES = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD']);
 
 export const PAIRS = [
-  'EURUSD', 'XAUUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD',
+  'EURUSD', 'XAUUSD', 'BTCUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD',
   'EURGBP', 'EURJPY', 'GBPJPY', 'XAGUSD',
 ];
 
@@ -29,11 +34,12 @@ export class MarketError extends Error {}
 
 export function normPair(raw: string): string {
   const p = String(raw || '').toUpperCase().replace(/[\/_\-\s]|=X/g, '');
-  const alias: Record<string, string> = { GOLD: 'XAUUSD', SILVER: 'XAGUSD' };
+  const alias: Record<string, string> = { GOLD: 'XAUUSD', SILVER: 'XAGUSD', BITCOIN: 'BTCUSD', BTC: 'BTCUSD', XBTUSD: 'BTCUSD' };
   const pair = alias[p] || p;
   const base = pair.slice(0, 3);
   const quote = pair.slice(3);
-  const baseOk = CURRENCIES.has(base) || base in METALS;
+  if (base in CRYPTO && quote !== 'USD') throw new MarketError(`${base} is only supported against USD (use ${base}USD)`);
+  const baseOk = CURRENCIES.has(base) || base in METALS || base in CRYPTO;
   if (pair.length !== 6 || !baseOk || !CURRENCIES.has(quote) || base === quote) {
     throw new MarketError(`Not a supported pair: ${raw}`);
   }
@@ -42,21 +48,28 @@ export function normPair(raw: string): string {
 
 export const isMetal = (pair: string) => pair.slice(0, 3) in METALS;
 
+/** Crypto trades 24/7: no FX sessions, no weekend close. */
+export const isCrypto = (pair: string) => pair.slice(0, 3) in CRYPTO;
+
 export function pipSize(pair: string): number {
+  if (isCrypto(pair)) return CRYPTO[pair.slice(0, 3)].pip;
   if (isMetal(pair)) return METALS[pair.slice(0, 3)].pip;
   return pair.slice(3) === 'JPY' ? 0.01 : 0.0001;
 }
 
 export function decimals(pair: string): number {
+  if (isCrypto(pair)) return CRYPTO[pair.slice(0, 3)].dec;
   if (isMetal(pair)) return METALS[pair.slice(0, 3)].dec;
   return pair.slice(3) === 'JPY' ? 3 : 5;
 }
 
 export function contract(pair: string): number {
+  if (isCrypto(pair)) return CRYPTO[pair.slice(0, 3)].contract;
   return isMetal(pair) ? METALS[pair.slice(0, 3)].contract : 100000;
 }
 
 export function yahooSymbol(pair: string): string {
+  if (isCrypto(pair)) return CRYPTO[pair.slice(0, 3)].symbol;
   if (isMetal(pair) && pair.slice(3) === 'USD') return METALS[pair.slice(0, 3)].future;
   return `${pair}=X`;
 }
@@ -205,8 +218,9 @@ export async function size(input: SizeInput) {
   const targetPips = target != null ? Math.abs(target - entry) / ps : null;
   return {
     pair, side, lots,
-    units: Math.round(lots * contract(pair)),
-    unitName: isMetal(pair) ? 'oz' : 'units',
+    // currencies trade in whole units; a coin splits (0.44 lots = 0.44 BTC)
+    units: isCrypto(pair) ? roundTo(lots * contract(pair), 2) : Math.round(lots * contract(pair)),
+    unitName: isMetal(pair) ? 'oz' : isCrypto(pair) ? pair.slice(0, 3) : 'units',
     limit: lots === roundTo(byRisk, 2) ? 'max loss' : 'leverage',
     byRisk: roundTo(byRisk, 2), byLeverage: roundTo(byLeverage, 2),
     pipValue: roundTo(pipValue, 2), stopPips: roundTo(stopPips, 1),

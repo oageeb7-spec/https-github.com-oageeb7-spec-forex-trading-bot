@@ -9,7 +9,7 @@
 // risk veto always ends in SKIP, whatever an agent says.
 import { ai } from '@appdeploy/sdk';
 import { analyze, atr, Setup } from './analyze';
-import { Bar, clock, fetchBars, pipSize, roundTo, size } from './market';
+import { Bar, clock, fetchBars, isCrypto, pipSize, roundTo, size } from './market';
 
 const SWING = 3;
 const TFS = ['15m', '1h', '4h', '1d'];
@@ -192,7 +192,9 @@ async function riskManager(s: Setup, bars: Bar[]): Promise<AgentReport> {
       + '(noise will hit it), reward:risk under 1.5, or a trade into the weekend close. Never invent numbers. '
       + 'Call each tool at most once, then call emit_result.',
     prompt: `Proposed ${s.side} ${s.pair} on ${s.timeframe}: entry ${s.entry}, stop ${s.stop}, TP1 ${s.tp1}, TP2 ${s.tp2 ?? 'none'}, `
-      + `reward:risk ${s.rr}, ${s.entryType} entry. Check it with the tools, then call emit_result.`,
+      + `reward:risk ${s.rr}, ${s.entryType} entry. `
+      + (isCrypto(s.pair) ? 'This is crypto: it trades 24/7, so there is no weekend close and FX sessions do not apply; 1 pip = $1, 1 lot = 1 coin. ' : '')
+      + 'Check it with the tools, then call emit_result.',
     tools: [
       { name: 'size_position', description: 'Lots, loss at stop, gain at target and margin for a USD account.', parameters: {
         type: 'object', properties: { account_usd: { type: 'number', minimum: 100 }, risk_pct: { type: 'number', minimum: 0.1, maximum: 5 } },
@@ -210,7 +212,7 @@ async function riskManager(s: Setup, bars: Bar[]): Promise<AgentReport> {
         const stopPips = Math.abs((s.entry as number) - (s.stop as number)) / ps;
         return { atr_pips: roundTo(a / ps, 1), stop_pips: roundTo(stopPips, 1), stop_in_atr: roundTo(stopPips / (a / ps), 2) };
       },
-      get_session: () => clock(),
+      get_session: () => ({ ...clock(), crypto_trades_24_7: isCrypto(s.pair) }),
     },
     result: {
       type: 'object',

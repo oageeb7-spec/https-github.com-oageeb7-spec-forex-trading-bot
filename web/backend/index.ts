@@ -1,6 +1,6 @@
 import { router, json, error, db } from '@appdeploy/sdk';
 import { analyze, track, Setup } from './analyze';
-import { Bar, MarketError, PAIRS, TIMEFRAMES, clock, fetchBars, normPair, size } from './market';
+import { Bar, MarketError, PAIRS, TIMEFRAMES, clock, fetchBars, isCrypto, normPair, size } from './market';
 import { DeskReview, runDesk } from './agents';
 import {
   FeedEvent, META, REVIEWS, SIGNALS, budgetUsed, closeSignal, feedAdd, feedList, getDoc, indexAdd,
@@ -10,7 +10,7 @@ import {
 const SWING = 3;
 const CHART_BARS = 220;
 const AGENT_RUNS_PER_HOUR = 40;            // protects AI credits on a public page
-const WATCHLIST = ['EURUSD', 'XAUUSD', 'GBPUSD', 'USDJPY'];
+const WATCHLIST = ['EURUSD', 'XAUUSD', 'BTCUSD', 'GBPUSD', 'USDJPY'];
 const SCAN_TFS = ['15m', '1h'];
 const SCAN_MIN_RR = 2;
 const REVIEWS_PER_SCAN = 1;                // AI only for new setups, at most one per run
@@ -128,13 +128,12 @@ async function scan(trigger: 'cron' | 'manual', withAgents: boolean): Promise<Sc
   const events: FeedEvent[] = [];
   const doc: ScannerDoc = { lastRun: t0, trigger, scanned: 0, found: 0, reviewed: 0, closed: 0, errors: 0, note: '', ms: 0, setups: [] };
   const c = clock();
-  if (!c.open) {
-    doc.note = 'FX market is closed - nothing to scan until Sunday 17:00 New York.';
-    // a person pressed the button: say why nothing happened (the schedule stays quiet all weekend)
-    if (trigger === 'manual') events.push({ at: Date.now(), agent: 'scanner', tone: 'info', text: `Scanner: ${doc.note}` });
-  } else {
+  // FX closes for the weekend; crypto trades 24/7, so it is always scanned
+  const pairs = c.open ? WATCHLIST : WATCHLIST.filter(isCrypto);
+  if (!c.open) doc.note = 'FX market is closed until Sunday 17:00 New York - scanned crypto only.';
+  {
     const fresh: Array<{ id: string; s: Setup; bars: Bar[] }> = [];
-    for (const pair of WATCHLIST) {
+    for (const pair of pairs) {
       for (const tf of SCAN_TFS) {
         try {
           const bars = await fetchBars(pair, tf);
@@ -159,7 +158,8 @@ async function scan(trigger: 'cron' | 'manual', withAgents: boolean): Promise<Sc
     events.push({
       at: Date.now(), agent: 'scanner', tone: doc.found ? 'good' : 'info',
       text: `Scanner: read ${doc.scanned} charts - ${doc.setups.length ? `setups on ${doc.setups.join(', ')}` : 'no setups that meet 1:2'}`
-        + `${doc.found ? ` (${doc.found} new, logged)` : ''}${doc.errors ? `; ${doc.errors} chart(s) failed to load` : ''}`,
+        + `${doc.found ? ` (${doc.found} new, logged)` : ''}${doc.errors ? `; ${doc.errors} chart(s) failed to load` : ''}`
+        + `${doc.note ? `. ${doc.note}` : ''}`,
     });
     if (withAgents) {
       for (const f of fresh.slice(0, REVIEWS_PER_SCAN)) {

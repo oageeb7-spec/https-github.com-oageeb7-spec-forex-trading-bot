@@ -41,14 +41,29 @@ METALS = {  # symbol: (contract size in oz per lot, pip size, decimals, Yahoo fu
     "XAU": (100, 0.1, 2, "GC=F"),
     "XAG": (5000, 0.01, 3, "SI=F"),
 }
+# crypto, quoted in USD only. Broker convention: 1 lot = 1 coin, 1 pip = $1.
+CRYPTO = {  # symbol: (coins per lot, pip size, decimals, Yahoo symbol)
+    "BTC": (1, 1.0, 2, "BTC-USD"),
+}
 
 
 def contract(pair: str) -> int:
+    if pair[:3] in CRYPTO:
+        return CRYPTO[pair[:3]][0]
     return METALS[pair[:3]][0] if pair[:3] in METALS else LOT
 
 
 def is_metal(pair: str) -> bool:
     return pair[:3] in METALS
+
+
+def pair_coin(pair: str) -> str:
+    return pair[:3]
+
+
+def is_crypto(pair: str) -> bool:
+    """Crypto trades 24/7: no FX sessions, no weekend close."""
+    return pair[:3] in CRYPTO
 DEFAULTS = {
     "account_size": 10000, "account_currency": "USD", "risk_pct": 1.0,
     "max_loss_per_trade": None, "max_leverage": 30, "min_reward_risk": 1.5,
@@ -70,20 +85,27 @@ class FxError(Exception):
 
 def norm_pair(s: str) -> str:
     p = s.upper().replace("/", "").replace("_", "").replace("-", "").replace("=X", "").strip()
-    p = {"GOLD": "XAUUSD", "SILVER": "XAGUSD", "XAU": "XAUUSD", "XAG": "XAGUSD"}.get(p, p)
-    base_ok = p[:3] in CURRENCIES or p[:3] in METALS
+    p = {"GOLD": "XAUUSD", "SILVER": "XAGUSD", "XAU": "XAUUSD", "XAG": "XAGUSD",
+         "BITCOIN": "BTCUSD", "BTC": "BTCUSD", "XBTUSD": "BTCUSD"}.get(p, p)
+    if p[:3] in CRYPTO and p[3:] != "USD":
+        raise FxError(f"{p[:3]} is only supported against USD (use {p[:3]}USD)")
+    base_ok = p[:3] in CURRENCIES or p[:3] in METALS or p[:3] in CRYPTO
     if len(p) != 6 or not base_ok or p[3:] not in CURRENCIES or p[:3] == p[3:]:
-        raise FxError(f"not a currency pair: {s!r} (use e.g. EURUSD, EUR/USD or XAUUSD)")
+        raise FxError(f"not a currency pair: {s!r} (use e.g. EURUSD, EUR/USD, XAUUSD or BTCUSD)")
     return p
 
 
 def pip_size(pair: str) -> float:
+    if is_crypto(pair):
+        return CRYPTO[pair[:3]][1]
     if is_metal(pair):
         return METALS[pair[:3]][1]
     return 0.01 if pair[3:] == "JPY" else 0.0001
 
 
 def decimals(pair: str) -> int:
+    if is_crypto(pair):
+        return CRYPTO[pair[:3]][2]
     if is_metal(pair):
         return METALS[pair[:3]][2]
     return 3 if pair[3:] == "JPY" else 5
@@ -119,7 +141,8 @@ def _yahoo(pair: str, rng: str, offline: str | None) -> dict:
         last = None
         for host in ("query2.finance.yahoo.com", "query1.finance.yahoo.com"):
             try:
-                sym = METALS[pair[:3]][3] if is_metal(pair) and pair[3:] == "USD" else f"{pair}=X"
+                sym = (CRYPTO[pair[:3]][3] if is_crypto(pair)
+                       else METALS[pair[:3]][3] if is_metal(pair) and pair[3:] == "USD" else f"{pair}=X")
                 text = _get(f"https://{host}/v8/finance/chart/{sym}?range={rng}&interval=1d")
                 break
             except FxError as e:
@@ -433,11 +456,13 @@ def cmd_size(a) -> int:
         print(f"Size: 0 lots. The stop is too wide for a {max_loss:,.2f} {acct} max loss even at "
               f"{step} lots. Tighten the stop or raise the risk.")
         return 1
-    unit_name = "oz" if is_metal(p) else "units"
-    print(f"Size: {lots:.2f} lots = {int(round(lots * contract(p))):,} {unit_name}  (limit: {binds})")
+    unit_name = "oz" if is_metal(p) else pair_coin(p) if is_crypto(p) else "units"
+    # currencies trade in whole units; a coin splits (0.44 lots = 0.44 BTC)
+    units = round(lots * contract(p), 2) if is_crypto(p) else int(round(lots * contract(p)))
+    print(f"Size: {lots:.2f} lots = {units:,} {unit_name}  (limit: {binds})")
     print(f"  Loss at stop  {loss:,.2f} {acct}    Gain at target {gain:,.2f} {acct}    "
           f"Margin ~{margin:,.2f} {acct} at {cfg['max_leverage']}:1")
-    order = {"pair": p, "side": plan["side"], "units": int(round(lots * contract(p))), "lots": lots,
+    order = {"pair": p, "side": plan["side"], "units": units, "lots": lots,
              "type": "market", "stop_loss": plan["stop"], "take_profit": plan["target"],
              "max_loss": round(loss, 2), "account_currency": acct}
     if a.write:

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '@appdeploy/client';
 import { Calculator } from 'lucide-react';
 import type { Setup, SizeResult } from '../lib/types';
-import { errorText, money, pairLabel } from '../lib/format';
+import { errorText, isCrypto, money, pairLabel } from '../lib/format';
 
 type Props = { pair: string; setup: Setup | null };
 
@@ -96,9 +96,9 @@ export default function Sizer({ pair, setup }: Props) {
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             <dt className="text-slate-400">Loss at stop</dt><dd className="text-right font-mono text-rose-300">{money(result.lossAtStop)}</dd>
             <dt className="text-slate-400">Gain at target</dt><dd className="text-right font-mono text-emerald-300">{money(result.gainAtTarget)}</dd>
-            <dt className="text-slate-400">Stop distance</dt><dd className="text-right font-mono text-slate-200">{result.stopPips} pips</dd>
+            <dt className="text-slate-400">Stop distance</dt><dd className="text-right font-mono text-slate-200">{isCrypto(pair) ? `$${result.stopPips}` : `${result.stopPips} pips`}</dd>
             <dt className="text-slate-400">Reward : risk</dt><dd className="text-right font-mono text-slate-200">{result.rewardRisk ?? '-'}</dd>
-            <dt className="text-slate-400">Pip value / lot</dt><dd className="text-right font-mono text-slate-200">{money(result.pipValue)}</dd>
+            <dt className="text-slate-400">{isCrypto(pair) ? 'Per $1 move / lot' : 'Pip value / lot'}</dt><dd className="text-right font-mono text-slate-200">{money(result.pipValue)}</dd>
             <dt className="text-slate-400">Margin</dt><dd className="text-right font-mono text-slate-200">{money(result.margin)}</dd>
           </dl>
           <p className="mt-2 text-xs text-slate-500">

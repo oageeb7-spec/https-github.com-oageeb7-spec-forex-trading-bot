@@ -11,7 +11,7 @@ globalThis.fetch = (async (input: any, init?: any) => {
   const url = String(input);
   if (url.includes('finance.yahoo.com')) {
     const sym = decodeURIComponent(url.split('/chart/')[1].split('?')[0]);
-    const file = sym === 'EURUSD=X' ? 'EURUSD_15m.json' : sym === 'GC=F' ? 'XAUUSD_15m.json' : null;
+    const file = sym === 'EURUSD=X' ? 'EURUSD_15m.json' : sym === 'GC=F' ? 'XAUUSD_15m.json' : sym === 'BTC-USD' ? 'BTCUSD_15m.json' : null;
     if (!file || process.env.FEED_DOWN) return new Response('{}', { status: 503 });
     const data = JSON.parse(readFileSync(join(FIX, file), 'utf8'));
     if (cut > 0) {   // pretend it is earlier: drop the newest `cut` bars

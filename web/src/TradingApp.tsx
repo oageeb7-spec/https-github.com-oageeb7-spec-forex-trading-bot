@@ -11,7 +11,7 @@ import PerformancePanel from './components/PerformancePanel';
 import type { Analysis, Clock, DeskReview, FeedEvent, Level, Meta, Performance, Signal } from './lib/types';
 import { COLORS, decimals, errorText, pairLabel, price, timeAgo } from './lib/format';
 
-const FALLBACK_PAIRS = ['EURUSD', 'XAUUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'XAGUSD'];
+const FALLBACK_PAIRS = ['EURUSD', 'XAUUSD', 'BTCUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'XAGUSD'];
 const TIMEFRAMES = [['15m', '15m'], ['1h', '1H'], ['4h', '4H'], ['1d', '1D']] as const;
 const MIN_RR = [1.5, 2, 2.5, 3];
 const REFRESH_MS = 60_000;
@@ -352,7 +352,7 @@ export default function TradingApp() {
           <div className="p-4" role="tabpanel">
             {tab === 'activity' && (
               <ActivityFeed events={events} scanner={scanner} scanning={scanning} scanNote={scanNote} onScan={() => void runScanner()}
-                watchlist={meta?.watchlist ?? ['EURUSD', 'XAUUSD', 'GBPUSD', 'USDJPY']} />
+                watchlist={meta?.watchlist ?? ['EURUSD', 'XAUUSD', 'BTCUSD', 'GBPUSD', 'USDJPY']} />
             )}
             {tab === 'log' && (
               <SignalLog signals={signals} loading={logLoading} error={logError} checkedAt={checkedAt}

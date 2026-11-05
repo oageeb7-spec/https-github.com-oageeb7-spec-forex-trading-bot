@@ -10,7 +10,8 @@ def mirror(bars, m):
              "high": m - b["low"], "low": m - b["high"]} for b in bars]
 
 out = []
-for pair, fname, m in (("EURUSD", "EURUSD_15m.json", 2.24), ("XAUUSD", "XAUUSD_15m.json", 8000.0)):
+for pair, fname, m in (("EURUSD", "EURUSD_15m.json", 2.24), ("XAUUSD", "XAUUSD_15m.json", 8000.0),
+                       ("BTCUSD", "BTCUSD_15m.json", 160000.0)):
     with open(os.path.join(SK, "tests", "fixtures", fname)) as f:
         bars = setup.parse_chart(f.read())
     variants = {"real": bars, "mirror": mirror(bars, m), "merged4": setup.merge(bars, 4)}

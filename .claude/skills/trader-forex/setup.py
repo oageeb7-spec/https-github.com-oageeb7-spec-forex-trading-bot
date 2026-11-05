@@ -40,13 +40,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+from decimal import ROUND_HALF_UP, Decimal
 import os
 import sys
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from fx import (FxError, METALS, _get, decimals, fmt, is_metal,  # noqa: E402
+from fx import (CRYPTO, FxError, METALS, _get, decimals, fmt, is_crypto, is_metal,  # noqa: E402
                 load_config, norm_pair, pip_size)
 
 TF = {  # timeframe: (yahoo interval, yahoo range, bars to merge)
@@ -62,6 +64,8 @@ ZONE_LOOKBACK = 60
 # ------------------------------------------------------------------ data
 
 def yahoo_symbol(pair: str) -> str:
+    if is_crypto(pair):
+        return CRYPTO[pair[:3]][3]
     if is_metal(pair) and pair[3:] == "USD":
         return METALS[pair[:3]][3]
     return f"{pair}=X"
@@ -224,11 +228,28 @@ def order_block(bars, side, break_idx):
 
 # ------------------------------------------------------------------ decision
 
+def rnd(x: float, n: int) -> float:
+    """Round exact halves away from zero, like JavaScript's toFixed. Python's round()
+    sends exact halves to the even digit (295.25 -> 295.2), which only shows up on
+    prices that are exact in binary, such as BTC's 2-decimal prices; the web app must
+    give the same numbers, so both use this rule."""
+    return float(Decimal(x).quantize(Decimal(1).scaleb(-n), rounding=ROUND_HALF_UP))
+
+
+def min_stop_distance(pair: str, entry: float) -> float:
+    """Smallest stop the spread and noise allow: 5 pips on FX, 20 ($2) on gold and
+    silver, 0.1% of the price on crypto (a fixed pip count means nothing at $80,000)."""
+    ps = pip_size(pair)
+    if is_crypto(pair):
+        return math.ceil(entry * 0.001 / ps) * ps
+    return 20 * ps if is_metal(pair) else 5 * ps
+
+
 def analyze(pair: str, bars: list[dict], swing: int, min_rr: float, tf: str) -> dict:
     p = pair
     ps = pip_size(p)
     dec = decimals(p)
-    r = lambda x: round(x, dec)  # noqa: E731
+    r = lambda x: rnd(x, dec)  # noqa: E731
     out = {"pair": p, "timeframe": tf, "decision": "no_trade", "side": None, "reasons": [],
            "price": r(bars[-1]["close"]) if bars else None,
            "last_bar_time": bars[-1]["t"] if bars else None,
@@ -328,7 +349,7 @@ def analyze(pair: str, bars: list[dict], swing: int, min_rr: float, tf: str) -> 
         stop = base + buf
         where = "the zone and the last swing high" if prot else "the zone"
     risk = abs(entry - stop)
-    min_stop = 5 * ps if not is_metal(p) else 20 * ps
+    min_stop = min_stop_distance(p, entry)
     if risk < min_stop:
         stop = entry - sgn * min_stop
         risk = min_stop
@@ -366,9 +387,9 @@ def analyze(pair: str, bars: list[dict], swing: int, min_rr: float, tf: str) -> 
         "side": "buy" if side == "bull" else "sell", "entry_type": entry_type,
         "entry": r(entry), "stop": r(stop), "tp1": r(tp1), "tp2": r(tp2) if tp2 is not None else None,
         "zone": {"kind": kind, "low": r(z_lo), "high": r(z_hi)},
-        "stop_pips": round(risk / ps, 1), "tp1_pips": round(abs(tp1 - entry) / ps, 1),
-        "tp2_pips": round(abs(tp2 - entry) / ps, 1) if tp2 is not None else None,
-        "rr_tp1": round(abs(tp1 - entry) / risk, 2), "rr": round(rr, 2), "atr_pips": round(a / ps, 1),
+        "stop_pips": rnd(risk / ps, 1), "tp1_pips": rnd(abs(tp1 - entry) / ps, 1),
+        "tp2_pips": rnd(abs(tp2 - entry) / ps, 1) if tp2 is not None else None,
+        "rr_tp1": rnd(abs(tp1 - entry) / risk, 2), "rr": rnd(rr, 2), "atr_pips": rnd(a / ps, 1),
     })
     if rr < min_rr:
         reasons.append(f"No Trade: reward:risk {rr:.2f} is under the {min_rr:g} minimum")
@@ -452,8 +473,8 @@ def track(s: dict, bars: list[dict]) -> dict:
         if not tp1_hit and (favour - s["tp1"]) * sgn >= 0:
             tp1_hit, status = True, "TP1 hit"
             events.append(f"{t} TP1 hit at {fmt(p, s['tp1'])}")
-    price = round(bars[-1]["close"], decimals(p))
-    pips = lambda x: round(x / ps, 1) + 0.0  # noqa: E731  (+0.0 turns -0.0 into 0.0)
+    price = rnd(bars[-1]["close"], decimals(p))
+    pips = lambda x: rnd(x / ps, 1) + 0.0  # noqa: E731  (+0.0 turns -0.0 into 0.0)
     res = {"status": status, "price": price, "events": events, "bars_since": len(after),
            "to_stop_pips": pips((price - s["stop"]) * sgn),
            "to_tp1_pips": pips((s["tp1"] - price) * sgn)}

@@ -10,10 +10,14 @@ export function pairLabel(pair: string): string {
   const name = `${pair.slice(0, 3)}/${pair.slice(3)}`;
   if (pair === 'XAUUSD') return `${name} · Gold`;
   if (pair === 'XAGUSD') return `${name} · Silver`;
+  if (pair === 'BTCUSD') return `${name} · Bitcoin`;
   return name;
 }
 
+export const isCrypto = (pair: string) => pair.startsWith('BTC');
+
 export function decimals(pair: string): number {
+  if (isCrypto(pair)) return 2;
   if (pair.startsWith('XAU')) return 2;
   if (pair.startsWith('XAG')) return 3;
   return pair.endsWith('JPY') ? 3 : 5;
@@ -28,9 +32,11 @@ export function money(x: number | null | undefined): string {
   return x.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 }
 
-export function signedPips(x: number | null | undefined): string {
+export function signedPips(x: number | null | undefined, pair = ''): string {
   if (x == null) return '-';
-  return `${x > 0 ? '+' : ''}${x.toFixed(1)} pips`;
+  const sign = x > 0 ? '+' : x < 0 ? '-' : '';
+  // on crypto 1 pip = $1, so show dollars - "225 pips" on bitcoin reads wrong
+  return isCrypto(pair) ? `${sign}$${Math.abs(x).toFixed(1)}` : `${sign}${Math.abs(x).toFixed(1)} pips`;
 }
 
 export function timeAgo(ms: number): string {

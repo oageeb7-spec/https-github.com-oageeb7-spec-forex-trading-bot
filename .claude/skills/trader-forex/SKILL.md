@@ -48,6 +48,16 @@ Files: `trader/fx_plan.json` (plan), `trader/fx_orders.json` (proposed order),
 `fx.py` commands take `--offline DIR` (files named `yahoo-EURUSD.json` or
 `stooq-EURUSD.csv`); `setup.py` takes `--offline FILE` (one saved Yahoo chart JSON).
 
+## Bitcoin (BTCUSD)
+
+`BTCUSD` (or `bitcoin`, `BTC`), USD-quoted only, from Yahoo `BTC-USD`. Broker
+convention: 1 lot = 1 BTC and 1 pip = $1, so pip value is $1 a lot and sizes
+come out in fractions of a coin (0.44 lots = 0.44 BTC). Crypto trades 24/7: there
+is no weekend close and the FX session clock does not apply. The setup finder's
+minimum stop on BTC is 0.1% of the price, since a fixed pip count means nothing at
+$80,000. Check your broker's contract size and leverage for crypto; many cap it far
+below forex.
+
 ## Setup finder (setup.py)
 
 One decision per run, from the bars alone - nothing is guessed:

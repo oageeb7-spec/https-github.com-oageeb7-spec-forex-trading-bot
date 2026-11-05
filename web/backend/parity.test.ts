@@ -15,7 +15,7 @@ const mirror = (bars: Bar[], m: number): Bar[] =>
   bars.map((b) => ({ t: b.t, vol: b.vol, open: m - b.open, close: m - b.close, high: m - b.low, low: m - b.high }));
 
 const data: Record<string, Record<string, Bar[]>> = {};
-for (const [pair, file, m] of [['EURUSD', 'EURUSD_15m.json', 2.24], ['XAUUSD', 'XAUUSD_15m.json', 8000]] as const) {
+for (const [pair, file, m] of [['EURUSD', 'EURUSD_15m.json', 2.24], ['XAUUSD', 'XAUUSD_15m.json', 8000], ['BTCUSD', 'BTCUSD_15m.json', 160000]] as const) {
   const bars = parseChart(JSON.parse(readFileSync(new URL(file, FIX), 'utf8')));
   data[pair] = { real: bars, mirror: mirror(bars, m), merged4: merge(bars, 4) };
 }
