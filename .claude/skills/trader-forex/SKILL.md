@@ -13,14 +13,14 @@ description: >-
   breaks of structure, liquidity sweeps, premium/discount and fair-value
   gaps / order blocks on 15m/1h/4h/1d, and returns one decision - buy or sell
   with entry, stop, TP1, TP2, reward:risk and the reasons - or No Trade, then
-  tracks it. Gold (XAUUSD) and silver (XAGUSD) too. Connects to STARTRADER
+  tracks it. Gold (XAUUSD), silver (XAGUSD) and Bitcoin (BTCUSD) too. Connects to STARTRADER
   (or any MetaTrader 5 broker) through the MT5 terminal, or to OANDA, to read
   the balance and positions and, only after a risk check and the user's own
   typed yes, send one order with stop-loss and take-profit. Use when the user says "forex", "FX",
   "EUR/USD", "cable", "how many lots", "pip value", "is forex open", "which
   session", "scan the majors", "gold", "analyze gold", "give me a signal on
   EURUSD", "is there a setup", "smart money", "liquidity", "track my setup",
-  "STARTRADER", "MT5", "MetaTrader", "OANDA", "send my forex order", or names a currency pair.
+  "bitcoin", "BTC", "STARTRADER", "MT5", "MetaTrader", "OANDA", "send my forex order", or names a currency pair.
 argument-hint: "[pair] [price]"
 ---
 
