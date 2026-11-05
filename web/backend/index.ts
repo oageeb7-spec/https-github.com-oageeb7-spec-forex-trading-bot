@@ -57,14 +57,20 @@ async function runAnalysis(pairRaw: string, tfRaw: string | undefined, minRaw: s
   return { pair, tf, minRR, bars, setup: analyze(pair, bars, SWING, minRR, tf) };
 }
 
-/** A setup is what it is - market, timeframe, side, entry and stop - not the candle it was
- * read on: Yahoo's last candle is still forming, so its time changes every scan and the same
- * setup used to be logged (and reviewed) again every 15 minutes. Readings without levels fall
- * back to the candle time. Also the desk review id. */
+/** A setup is its entry zone - market, timeframe, side and the fair-value gap or order block it
+ * trades from. Not the candle it was read on (Yahoo's last candle is still forming, so its time
+ * changes every scan), and not the entry price either: a market entry is the current price, which
+ * also moves every scan. The zone's edges stay put while the setup lives, so the same trade idea
+ * is logged and reviewed once. Readings without a zone fall back to entry and stop, then to the
+ * candle time. Also the desk review id. */
 function setupId(s: Setup, minRR: number): string {
   const rr = String(minRR).replace('.', 'p');
+  const n = (x: number) => String(x).replace('.', 'p').replace('-', 'm');
+  if (s.side && s.zone) {
+    const kind = s.zone.kind === 'order block' ? 'ob' : 'fvg';
+    return `${s.pair}_${s.timeframe}_${s.side}_${kind}_${n(s.zone.low)}_${n(s.zone.high)}_${rr}`;
+  }
   if (s.side && s.entry != null && s.stop != null) {
-    const n = (x: number) => String(x).replace('.', 'p').replace('-', 'm');
     return `${s.pair}_${s.timeframe}_${s.side}_${n(s.entry)}_${n(s.stop)}_${rr}`;
   }
   return `${s.pair}_${s.timeframe}_${s.lastBarTime}_${rr}`;
@@ -73,7 +79,7 @@ function setupId(s: Setup, minRR: number): string {
 /** One-time repair: drop duplicate signals logged before setupId was fixed and rebuild the
  * forward-test stats from what is left, so the record counts each trade once. */
 async function dedupeOnce(): Promise<FeedEvent | null> {
-  const FLAG = 'migration_dedupe_v2';
+  const FLAG = 'migration_dedupe_v3';   // v3: group by entry zone (v2 grouped by entry and stop)
   if ((await getDoc<{ done: boolean }>(META, FLAG))?.done) return null;
   const ids = await indexIds();
   const docs = ids.length ? await db.get<SignalRecord>(SIGNALS, ids) : [];

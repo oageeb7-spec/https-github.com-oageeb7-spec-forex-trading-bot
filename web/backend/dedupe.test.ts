@@ -32,34 +32,34 @@ const signals = async () => {
 await scanMarkets();
 const first = await signals();
 check('scan logs setups', first.length > 0, first.length);
-check('setup ids carry the levels, not the candle time', first.every((s) => s.id.includes(`_${s.side}_`)), first.map((s) => s.id));
+check('setup ids carry the entry zone, not the candle time', first.every((s) => s.id.includes(`_${s.side}_fvg_`) || s.id.includes(`_${s.side}_ob_`)), first.map((s) => s.id));
 
 // 2. a candle later the same setups are not logged again (the old bug)
 cut = 199;
 await new Promise((r) => setTimeout(r, 31_000));   // let the 30-second price cache expire
 await scanMarkets();
 const second = await signals();
-const keys = second.map((s) => `${s.pair}|${s.timeframe}|${s.side}|${s.entry}|${s.stop}`);
-check('no setup is logged twice', new Set(keys).size === keys.length, keys);
+const keys = second.map((s) => `${s.pair}|${s.timeframe}|${s.side}|${s.zone?.low}|${s.zone?.high}`);
+check('no setup (entry zone) is logged twice', new Set(keys).size === keys.length, keys);
 
 // 3. plant duplicates the way the old ids made them, with a wrong, inflated record
-await db.tx.update('meta', [{ id: 'migration_dedupe_v2', record: { done: false } }]);
+await db.tx.update('meta', [{ id: 'migration_dedupe_v3', record: { done: false } }]);
 const base = second[0];
 const dupes = ['_1793600000_2', '_1793600900_2', '_1793601800_2'].map((sfx) => `${base.pair}_${base.timeframe}${sfx}`);
 const { id: _skip, ...rec } = base;
 void _skip;
-for (const id of dupes) await db.tx.add('signals', [{ ...rec, id, outcome: 'stopped', realizedR: -1 }]);
+for (const [k, id] of dupes.entries()) await db.tx.add('signals', [{ ...rec, id, entry: rec.entry + (k + 1) * 0.1, outcome: 'stopped', realizedR: -1 }]);
 await db.tx.update('signals', [{ id: base.id, record: { ...rec, outcome: 'stopped', realizedR: -1 } }]);
 await db.tx.update('meta', [{ id: 'index', record: { ids: [base.id, ...dupes, ...second.slice(1).map((s) => s.id)], v: 99 } }]);
 await db.tx.update('meta', [{ id: 'stats', record: { closed: 6, targetHit: 0, stopped: 6, stoppedAfterTp1: 0, missed: 0, rSum: -6 } }]);
 
 await scanMarkets();
 const after = await signals();
-const k2 = after.map((s) => `${s.pair}|${s.timeframe}|${s.side}|${s.entry}|${s.stop}`);
-check('repair removes the planted duplicates', new Set(k2).size === k2.length && !after.some((s) => dupes.includes(s.id)), after.map((s) => s.id));
+const k2 = after.map((s) => `${s.pair}|${s.timeframe}|${s.side}|${s.zone?.low}|${s.zone?.high}`);
+check('repair merges copies whose market entry drifted with price', new Set(k2).size === k2.length && !after.some((s) => dupes.includes(s.id)), after.map((s) => s.id));
 const [stats] = await db.get<Record<string, number>>('meta', ['stats']);
 check('stats rebuilt: the trade counts once', stats?.closed === 1 && stats?.stopped === 1 && stats?.rSum === -1, stats);
-const [flag] = await db.get<Record<string, unknown>>('meta', ['migration_dedupe_v2']);
+const [flag] = await db.get<Record<string, unknown>>('meta', ['migration_dedupe_v3']);
 check('repair is recorded and runs once', flag?.done === true && flag?.removed === 3, flag);
 const [feed] = await db.get<{ items: Array<{ text: string }> }>('meta', ['feed']);
 check('the feed explains the repair', Boolean(feed?.items.some((e) => e.text.startsWith('Maintenance: removed 3 duplicate'))), feed?.items.map((e) => e.text));
