@@ -4,5 +4,11 @@
     "cron": "*/15 * * * *",
     "handler": "scanMarkets",
     "timezone": "UTC"
+  },
+  {
+    "name": "telegram-poll",
+    "cron": "*/5 * * * *",
+    "handler": "pollTelegram",
+    "timezone": "UTC"
   }
 ]

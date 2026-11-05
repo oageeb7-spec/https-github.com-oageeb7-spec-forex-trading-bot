@@ -7,16 +7,16 @@
       "analyze workflow",
       "GET /api/analyze live price feed",
       "signal decision card with reasons",
-      "candlestick chart",
+      "level chart",
       "GET /api/meta market clock and KPI cards"
     ],
-    "description": "Verifies a live analysis returns one decision with its reasons, a drawn chart and the market clock.",
+    "description": "Verifies a live analysis returns one decision with its reasons, the level chart and the market clock.",
     "steps": [
       "Select 'EUR/USD' in the Market dropdown",
       "Click the '15m' timeframe button",
       "Click 'Analyze'"
     ],
-    "expected": "The signal card shows a decision of BUY, SELL or NO TRADE with a 'Why' list containing at least one reason, a candlestick chart is drawn in the Chart panel, and the header shows the market clock reading 'FX open' or 'FX closed'."
+    "expected": "The signal card shows a decision of BUY, SELL or NO TRADE with a 'Why' list containing at least one reason, the Levels panel shows the current price labelled 'Now' (with Entry, Stop and TP labels when the reading has levels) and no candlestick chart, and the header shows the market clock reading 'FX open' or 'FX closed'."
   },
   {
     "name": "Run the three-agent desk on a reading",
@@ -36,21 +36,23 @@
     "expected": "The Agent desk shows a final banner reading TAKE or SKIP, and three agent panels titled Market Analyst, Risk Manager and Head Trader each show a verdict label. The Market Analyst panel lists at least one tool it used, such as get_setup."
   },
   {
-    "name": "Run the scanner and read the agent activity and forward test",
+    "name": "Run the scanner, read the agent activity, forward test and Telegram status",
     "viewport": "desktop",
     "covers": [
       "POST /api/scanner/run",
       "GET /api/activity agent feed",
       "GET /api/performance forward test",
+      "GET /api/telegram status",
       "scanner cooldown"
     ],
-    "description": "Verifies the scanner runs on demand, reports in the agent activity feed, and the forward-test stats are shown.",
+    "description": "Verifies the scanner runs on demand and reports in the feed, and the forward test and Telegram setup status are shown.",
     "steps": [
       "Click the 'Agent activity' tab",
       "Click 'Run scanner now'",
-      "Click the 'Performance' tab"
+      "Click the 'Performance' tab",
+      "Click the 'Telegram' tab"
     ],
-    "expected": "After running the scanner a status line starting with 'Scanned' or 'The scanner ran' is visible and the activity list contains an entry starting with 'Scanner:'. The Performance tab shows 'Closed trades', 'Win rate' and 'Average R'."
+    "expected": "After running the scanner a status line starting with 'Scanned' or 'The scanner ran' is visible and the activity list contains an entry starting with 'Scanner:'. The Performance tab shows 'Closed trades', 'Win rate' and 'Average R'. The Telegram tab shows 'Telegram alerts' with a status badge such as 'Not set up' and the setup steps mentioning @BotFather."
   },
   {
     "name": "Save a reading, keep it after reload, then delete it",

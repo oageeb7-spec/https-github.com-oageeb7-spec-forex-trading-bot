@@ -1,11 +1,3 @@
-export const COLORS = {
-  up: '#26a69a',
-  down: '#ef5350',
-  entry: '#3b82f6',
-  tp2: '#0d9488',
-  zone: '#8b93a7',
-};
-
 export function pairLabel(pair: string): string {
   const name = `${pair.slice(0, 3)}/${pair.slice(3)}`;
   if (pair === 'XAUUSD') return `${name} · Gold`;

@@ -50,7 +50,12 @@ export async function indexAdd(id: string): Promise<void> {
 }
 
 export async function indexRemove(id: string): Promise<void> {
-  await updateDoc<Index>(META, 'index', { ids: [] }, (cur) => ({ ids: cur.ids.filter((x) => x !== id) }));
+  await indexRemoveMany([id]);
+}
+
+export async function indexRemoveMany(gone: string[]): Promise<void> {
+  const drop = new Set(gone);
+  await updateDoc<Index>(META, 'index', { ids: [] }, (cur) => ({ ids: cur.ids.filter((x) => !drop.has(x)) }));
 }
 
 export async function indexIds(): Promise<string[]> {

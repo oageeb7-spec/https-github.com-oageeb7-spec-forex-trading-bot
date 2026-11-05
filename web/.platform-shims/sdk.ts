@@ -153,3 +153,13 @@ export const ai = {
     return { text: 'local stub', steps: steps + 1, data: emit ? fill(emit.parameters) : undefined };
   },
 };
+
+// ---------------- secrets ----------------
+// STUB_TG=1 pretends a Telegram bot token was stored (the local server answers api.telegram.org).
+export const secrets = {
+  async listSecretNames() { return env.STUB_TG ? ['TELEGRAM_BOT_TOKEN'] : []; },
+  async readSecret(name: string) {
+    if (name === 'TELEGRAM_BOT_TOKEN' && env.STUB_TG) return 'LOCAL_TEST_TOKEN';
+    throw new Error(`secret ${name} is not set`);
+  },
+};

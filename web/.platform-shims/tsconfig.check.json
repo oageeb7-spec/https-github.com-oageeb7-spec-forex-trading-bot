@@ -7,5 +7,5 @@
       "@appdeploy/sdk": [".platform-shims/sdk.ts"]
     }
   },
-  "include": ["../src", "../backend/index.ts", "../backend/analyze.ts", "../backend/market.ts", "../backend/agents.ts", "../backend/store.ts"]
+  "include": ["../src", "../backend/index.ts", "../backend/analyze.ts", "../backend/market.ts", "../backend/agents.ts", "../backend/store.ts", "../backend/telegram.ts"]
 }

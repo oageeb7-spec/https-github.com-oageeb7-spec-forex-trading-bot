@@ -19,13 +19,14 @@ reward:risk plus the reasons, or NO TRADE when reward:risk is under your minimum
 | Head Trader | reads both reports, decides TAKE or SKIP with confidence and a plan | - |
 | Scanner (cron, every 15 min) | reads EUR/USD, gold, BTC/USD, GBP/USD, USD/JPY on 15m and 1h (BTC only at weekends, when FX is closed), logs new setups, sends the newest to the desk | engine |
 | Tracker (same cron) | closes logged trades at target or stop and counts them in the forward test | engine |
+| Telegram bot (cron, every 5 min) | sends agent-approved TAKE setups to the owner; answers `/signal`, `/alerts on|off`, `/status` | engine, saved reviews |
 
 Guardrails are code, not prompts: agents never set prices (levels come from the engine);
 an engine No Trade, a risk veto or an agent that fails to report always ends in SKIP;
 agent output is validated; an agent that runs out of steps gets one rescue pass with its
 own tool results; reviews are cached per reading; AI runs are capped at 40 per hour.
 
-**Page.** KPI cards, live chart with the levels, the signal card, the agent desk (each
+**Page.** KPI cards, a level chart (entry, stop, TP1, TP2, the entry zone and the current price, with distances - no candles or indicators), the signal card, the agent desk (each
 agent's verdict, confidence, findings, concerns and the tools it called), and tabs for
 the agent activity feed, the signal log (who logged it, the desk verdict, live status,
 final outcome and R), the forward test (win rate and average R from closed trades) and a
@@ -39,9 +40,10 @@ JARVIS (`/fxsend`) behind the risk check and your typed yes.
 | `backend/analyze.ts` | the setup finder and tracker, a port of `.claude/skills/trader-forex/setup.py` |
 | `backend/market.ts` | Yahoo bars, pair maths, lot sizing, market clock |
 | `backend/agents.ts` | the three AI agents, their tools and the guardrails |
+| `backend/telegram.ts` | the Telegram bot (token in the encrypted secret `TELEGRAM_BOT_TOKEN`; webhooks are blocked on AppDeploy, so it polls) |
 | `backend/store.ts` | bounded database documents (signal index, feed, stats, AI budget) with optimistic concurrency |
 | `backend/index.ts` | routes (`/api/meta`, `analyze`, `desk`, `size`, `signals`, `activity`, `performance`, `scanner/run`) and the `scanMarkets` cron handler |
-| `cron.json` | the 15-minute scanner schedule |
+| `cron.json` | the 15-minute scanner and 5-minute Telegram schedules |
 | `src/` | React + Tailwind frontend (chart is a small canvas renderer, no chart library) |
 | `tests/tests.json` | the AppDeploy QA suite run on every deploy |
 | `.platform-shims/` | local-only stand-ins for the AppDeploy SDK, to run and test the app here |
@@ -61,6 +63,9 @@ npx vite build -c .platform-shims/vite.local.config.ts
 # agent guardrails (veto, No Trade, rescue, AI outage) against the stub ai.run
 npx tsx --tsconfig .platform-shims/tsconfig.check.json backend/guard.test.ts
 
+# one record per setup, and the one-time repair of old duplicates
+npx tsx --tsconfig .platform-shims/tsconfig.check.json backend/dedupe.test.ts
+
 # run the whole app locally on http://localhost:5180 (Yahoo answered from the saved
 # real fixtures; FEED_DOWN=1 simulates a price-feed outage, CUT=200 starts 200 bars
 # in the past, GET /local/cut?n=0 moves to now, GET /local/cron fires the scheduled scan)
@@ -70,7 +75,7 @@ npx tsx --tsconfig .platform-shims/tsconfig.check.json .platform-shims/server.ts
 ## Deploying
 
 The deployed source is the files above minus `.platform-shims/`, `backend/parity*`,
-`backend/guard.test.ts` and this README. Redeploy through AppDeploy with app id `os-ai-trading-wg0h27`.
+`backend/guard.test.ts`, `backend/dedupe.test.ts` and this README. Redeploy through AppDeploy with app id `os-ai-trading-wg0h27`.
 
 ## Honest limits
 

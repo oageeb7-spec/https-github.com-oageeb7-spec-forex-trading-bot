@@ -1,21 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@appdeploy/client';
 import { Activity, Bot, Clock as ClockIcon, LineChart, Play, Radar, Trophy } from 'lucide-react';
-import Chart from './components/Chart';
+import LevelChart from './components/LevelChart';
 import SignalCard from './components/SignalCard';
 import Sizer from './components/Sizer';
 import SignalLog from './components/SignalLog';
 import AgentDesk from './components/AgentDesk';
 import ActivityFeed from './components/ActivityFeed';
 import PerformancePanel from './components/PerformancePanel';
-import type { Analysis, Clock, DeskReview, FeedEvent, Level, Meta, Performance, Signal } from './lib/types';
-import { COLORS, decimals, errorText, pairLabel, price, timeAgo } from './lib/format';
+import TelegramPanel from './components/TelegramPanel';
+import type { Analysis, Clock, DeskReview, FeedEvent, Meta, Performance, Signal } from './lib/types';
+import { errorText, pairLabel, price, timeAgo } from './lib/format';
 
 const FALLBACK_PAIRS = ['EURUSD', 'XAUUSD', 'BTCUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'XAGUSD'];
 const TIMEFRAMES = [['15m', '15m'], ['1h', '1H'], ['4h', '4H'], ['1d', '1D']] as const;
 const MIN_RR = [1.5, 2, 2.5, 3];
 const REFRESH_MS = 60_000;
-const TABS = [['activity', 'Agent activity'], ['log', 'Signal log'], ['performance', 'Performance'], ['sizer', 'Position sizer']] as const;
+const TABS = [['activity', 'Agent activity'], ['log', 'Signal log'], ['performance', 'Performance'], ['sizer', 'Position sizer'], ['telegram', 'Telegram']] as const;
 type Tab = typeof TABS[number][0];
 
 function load<T>(key: string, fallback: T): T {
@@ -33,23 +34,6 @@ function keep(key: string, value: unknown) {
   } catch {
     /* private mode: preferences just are not remembered */
   }
-}
-
-function levelsFor(a: Analysis | null): Level[] {
-  const s = a?.setup;
-  if (!s || s.entry == null || s.stop == null || s.tp1 == null) return [];
-  const f = (x: number) => x.toFixed(decimals(s.pair));
-  const out: Level[] = [
-    { price: s.entry, color: COLORS.entry, title: `Entry ${f(s.entry)}` },
-    { price: s.stop, color: COLORS.down, title: `SL ${f(s.stop)}` },
-    { price: s.tp1, color: COLORS.up, title: `TP1 ${f(s.tp1)}` },
-  ];
-  if (s.tp2 != null) out.push({ price: s.tp2, color: COLORS.tp2, title: `TP2 ${f(s.tp2)}` });
-  if (s.zone) {
-    out.push({ price: s.zone.high, color: COLORS.zone, title: 'Zone high' });
-    out.push({ price: s.zone.low, color: COLORS.zone, title: 'Zone low' });
-  }
-  return out;
 }
 
 /** Minutes until the next quarter hour - the scanner's schedule. */
@@ -233,7 +217,6 @@ export default function TradingApp() {
     }
   }
 
-  const levels = useMemo(() => levelsFor(analysis), [analysis]);
   const shownSetup = analysis && analysis.setup.pair === pair ? analysis.setup : null;
   const pairs = meta?.pairs?.length ? meta.pairs : FALLBACK_PAIRS;
   const clock = analysis?.clock ?? meta?.clock ?? null;
@@ -314,16 +297,16 @@ export default function TradingApp() {
         {error && <p role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p>}
 
         <div className="grid items-start gap-5 lg:grid-cols-3">
-          <section aria-label="Chart" className="rounded-2xl border border-white/10 bg-[#0f1520] p-3 lg:col-span-2">
+          <section aria-label="Levels" className="rounded-2xl border border-white/10 bg-[#0f1520] p-3 lg:col-span-2">
             <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
               <span className="font-semibold text-slate-300">{pairLabel(pair)} · {tf}</span>
-              <span>MA20 · levels from the current reading</span>
+              <span>Levels from the current reading · distance from now</span>
             </div>
-            {analysis && analysis.setup.pair === pair ? (
-              <Chart bars={analysis.bars} levels={levels} priceDecimals={decimals(pair)} label={`${pairLabel(pair)} ${tf} candlestick chart`} />
+            {shownSetup ? (
+              <LevelChart setup={shownSetup} />
             ) : (
-              <div className="flex h-[360px] items-center justify-center rounded-lg bg-[#0b1019] text-sm text-slate-500 sm:h-[440px]">
-                {analyzing ? 'Loading live prices...' : error ? 'No chart - the last analysis failed.' : 'Press Analyze to load the chart.'}
+              <div className="flex h-[380px] items-center justify-center rounded-xl bg-[#0b1019] text-sm text-slate-500">
+                {analyzing ? 'Loading live prices...' : error ? 'No levels - the last analysis failed.' : 'Press Analyze to read the market.'}
               </div>
             )}
           </section>
@@ -360,6 +343,7 @@ export default function TradingApp() {
             )}
             {tab === 'performance' && <PerformancePanel perf={perf} />}
             {tab === 'sizer' && <Sizer pair={pair} setup={shownSetup} />}
+            {tab === 'telegram' && <TelegramPanel />}
           </div>
         </section>
       </main>

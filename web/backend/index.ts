@@ -3,12 +3,12 @@ import { analyze, track, Setup } from './analyze';
 import { Bar, MarketError, PAIRS, TIMEFRAMES, clock, fetchBars, isCrypto, normPair, size } from './market';
 import { DeskReview, runDesk } from './agents';
 import {
-  FeedEvent, META, REVIEWS, SIGNALS, budgetUsed, closeSignal, feedAdd, feedList, getDoc, indexAdd,
-  indexIds, indexRemove, stats, takeAgentBudget,
+  EMPTY_STATS, FeedEvent, META, REVIEWS, SIGNALS, Stats, budgetUsed, closeSignal, feedAdd, feedList, getDoc, indexAdd,
+  indexIds, indexRemove, stats, takeAgentBudget, updateDoc,
 } from './store';
+import { alertTake, pollCommands, sendTest, telegramStatus } from './telegram';
 
 const SWING = 3;
-const CHART_BARS = 220;
 const AGENT_RUNS_PER_HOUR = 40;            // protects AI credits on a public page
 const WATCHLIST = ['EURUSD', 'XAUUSD', 'BTCUSD', 'GBPUSD', 'USDJPY'];
 const SCAN_TFS = ['15m', '1h'];
@@ -57,9 +57,71 @@ async function runAnalysis(pairRaw: string, tfRaw: string | undefined, minRaw: s
   return { pair, tf, minRR, bars, setup: analyze(pair, bars, SWING, minRR, tf) };
 }
 
-/** One record per pair, timeframe, closing bar and minimum - also the desk review id. */
+/** A setup is what it is - market, timeframe, side, entry and stop - not the candle it was
+ * read on: Yahoo's last candle is still forming, so its time changes every scan and the same
+ * setup used to be logged (and reviewed) again every 15 minutes. Readings without levels fall
+ * back to the candle time. Also the desk review id. */
 function setupId(s: Setup, minRR: number): string {
-  return `${s.pair}_${s.timeframe}_${s.lastBarTime}_${String(minRR).replace('.', 'p')}`;
+  const rr = String(minRR).replace('.', 'p');
+  if (s.side && s.entry != null && s.stop != null) {
+    const n = (x: number) => String(x).replace('.', 'p').replace('-', 'm');
+    return `${s.pair}_${s.timeframe}_${s.side}_${n(s.entry)}_${n(s.stop)}_${rr}`;
+  }
+  return `${s.pair}_${s.timeframe}_${s.lastBarTime}_${rr}`;
+}
+
+/** One-time repair: drop duplicate signals logged before setupId was fixed and rebuild the
+ * forward-test stats from what is left, so the record counts each trade once. */
+async function dedupeOnce(): Promise<FeedEvent | null> {
+  const FLAG = 'migration_dedupe_v2';
+  if ((await getDoc<{ done: boolean }>(META, FLAG))?.done) return null;
+  const ids = await indexIds();
+  const docs = ids.length ? await db.get<SignalRecord>(SIGNALS, ids) : [];
+  // group every logged copy of the same setup under its new id
+  const groups = new Map<string, number[]>();
+  const drop: string[] = [];
+  ids.forEach((id, i) => {
+    const s = docs[i];
+    if (!s) {
+      drop.push(id);
+      return;
+    }
+    const key = setupId(s, s.minRR);
+    groups.set(key, [...(groups.get(key) || []), i]);
+  });
+  // one survivor per setup, stored under the new id: the copy that has a result, else the earliest
+  const survivors: Array<{ key: string; rec: SignalRecord }> = [];
+  for (const [key, idxs] of groups) {
+    idxs.sort((a, b) => (docs[a]!.createdAt ?? 0) - (docs[b]!.createdAt ?? 0));
+    const pick = idxs.find((i) => docs[i]!.outcome) ?? idxs[0];
+    const rec = docs[pick]!;
+    survivors.push({ key, rec });
+    if (ids[pick] !== key) await db.tx.update(SIGNALS, [{ id: key, record: { ...rec } }]);
+    for (const i of idxs) if (ids[i] !== key) drop.push(ids[i]);
+  }
+  if (drop.length) await db.delete(SIGNALS, drop);
+  const order = survivors.sort((a, b) => (b.rec.createdAt ?? 0) - (a.rec.createdAt ?? 0)).map((x) => x.key);
+  await updateDoc<{ ids: string[] }>(META, 'index', { ids: [] }, () => ({ ids: order }));
+  const fresh: Stats = { ...EMPTY_STATS };
+  for (const { rec: s } of survivors) {
+    if (!s.outcome) continue;
+    if (s.outcome === 'missed') {
+      fresh.missed++;
+      continue;
+    }
+    fresh.closed++;
+    fresh.rSum += s.realizedR ?? 0;
+    if (s.outcome === 'target hit') fresh.targetHit++;
+    else if (s.outcome === 'stopped') fresh.stopped++;
+    else fresh.stoppedAfterTp1++;
+  }
+  const removed = ids.length - survivors.length;
+  await db.tx.update(META, [{ id: 'stats', record: { ...fresh } }]);
+  await db.tx.update(META, [{ id: FLAG, record: { done: true, removed, at: Date.now() } }]);
+  return {
+    at: Date.now(), agent: 'tracker', tone: 'info',
+    text: `Maintenance: removed ${removed} duplicate signal(s) and rebuilt the forward test - each setup now counts once (${fresh.closed} closed).`,
+  };
 }
 
 function deskEvents(r: DeskReview): FeedEvent[] {
@@ -164,8 +226,18 @@ async function scan(trigger: 'cron' | 'manual', withAgents: boolean): Promise<Sc
     if (withAgents) {
       for (const f of fresh.slice(0, REVIEWS_PER_SCAN)) {
         try {
-          const { cached } = await reviewSetup(f.id, f.s, f.bars, events);
+          const { review, cached } = await reviewSetup(f.id, f.s, f.bars, events);
           if (!cached) doc.reviewed++;
+          if (!cached && review.final === 'take') {
+            try {
+              if (await alertTake(f.s, review)) {
+                events.push({ at: Date.now(), agent: 'desk', pair: f.s.pair, tf: f.s.timeframe, tone: 'good',
+                  text: `Telegram: sent the ${label(f.s.pair)} ${f.s.timeframe} TAKE alert` });
+              }
+            } catch (e) {
+              console.warn('telegram alert failed', e instanceof Error ? e.message : e);
+            }
+          }
         } catch (e) {
           console.warn('desk review failed', f.id, e instanceof Error ? e.message : e);
         }
@@ -186,9 +258,32 @@ async function scan(trigger: 'cron' | 'manual', withAgents: boolean): Promise<Sc
 /** Cron: every 15 minutes. */
 export const scanMarkets = async () => {
   try {
+    const repaired = await dedupeOnce();
+    if (repaired) await feedAdd([repaired]);
+  } catch (e) {
+    console.error('duplicate repair failed', e);
+  }
+  try {
     await scan('cron', true);
   } catch (e) {
     console.error('scheduled scan failed', e);
+  }
+  return { statusCode: 200 };
+};
+
+/** /signal from Telegram: the engine's reading plus any saved desk review - no new AI run. */
+async function botAnalyze(pair: string, tf: string) {
+  const { setup, minRR } = await runAnalysis(pair, tf, 2);
+  const [review] = await db.get<DeskReview>(REVIEWS, [setupId(setup, minRR)]);
+  return { setup, review: review ?? null };
+}
+
+/** Cron: every 5 minutes - answer the owner's Telegram commands (AppDeploy blocks webhooks). */
+export const pollTelegram = async () => {
+  try {
+    await pollCommands(botAnalyze);
+  } catch (e) {
+    console.warn('telegram poll failed', e instanceof Error ? e.message : e);
   }
   return { statusCode: 200 };
 };
@@ -210,10 +305,9 @@ export const handler = router({
 
   'GET /api/analyze': [async ({ query }) => {
     try {
-      const { bars, setup, minRR } = await runAnalysis(query.pair, query.tf, query.minRR);
-      const chart = bars.slice(-CHART_BARS).map((b) => [b.t, b.open, b.high, b.low, b.close, b.vol]);
+      const { setup, minRR } = await runAnalysis(query.pair, query.tf, query.minRR);
       const [review] = await db.get<DeskReview>(REVIEWS, [setupId(setup, minRR)]);
-      return json({ setup, bars: chart, clock: clock(), analyzedAt: Date.now(), review: review ?? null });
+      return json({ setup, clock: clock(), analyzedAt: Date.now(), review: review ?? null });
     } catch (e) {
       return fail(e);
     }
@@ -310,6 +404,32 @@ export const handler = router({
         avgR: decided ? Math.round((s.rSum / decided) * 100) / 100 : null,
         note: 'Forward test of logged trades. R assumes the whole position is held from entry to the final target or the stop; spread and slippage are not included.',
       });
+    } catch (e) {
+      return fail(e);
+    }
+  }],
+
+  'GET /api/telegram': [async () => {
+    try {
+      return json(await telegramStatus());
+    } catch (e) {
+      return fail(e);
+    }
+  }],
+
+  'POST /api/telegram/test': [async () => {
+    try {
+      const r = await sendTest();
+      return r === 'sent' ? json({ sent: true }) : error(r, 400);
+    } catch (e) {
+      return fail(e);
+    }
+  }],
+
+  // Read new bot messages now instead of waiting up to 5 minutes (e.g. right after /start).
+  'POST /api/telegram/check': [async () => {
+    try {
+      return json({ answered: await pollCommands(botAnalyze), status: await telegramStatus() });
     } catch (e) {
       return fail(e);
     }

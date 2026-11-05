@@ -23,10 +23,7 @@ export type Setup = {
 
 export type Clock = { open: boolean; sessions: string[]; overlap: boolean; newYork: string };
 
-/** [time, open, high, low, close, volume] */
-export type BarRow = [number, number, number, number, number, number];
-
-export type Analysis = { setup: Setup; bars: BarRow[]; clock: Clock; analyzedAt: number; review: DeskReview | null };
+export type Analysis = { setup: Setup; clock: Clock; analyzedAt: number; review: DeskReview | null };
 
 export type Live = {
   status: string;
@@ -51,7 +48,6 @@ export type SizeResult = {
   maxLoss: number; lossAtStop: number; gainAtTarget: number | null; margin: number; rewardRisk: number | null;
 };
 
-export type Level = { price: number; color: string; title: string };
 
 export type ToolCall = { name: string; args: string };
 
