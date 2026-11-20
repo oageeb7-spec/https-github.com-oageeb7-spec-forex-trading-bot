@@ -62,6 +62,13 @@ string Letters(string s)
    return out;
   }
 
+bool IsCrypto()
+  {
+   string L = Letters(_Symbol);
+   return (StringFind(L, "BTC") == 0 || StringFind(L, "XBT") == 0 || StringFind(L, "BITCOIN") == 0 ||
+           StringFind(L, "ETH") == 0);
+  }
+
 bool Matches(string record_symbol)
   {
    string chart = Letters(_Symbol);
@@ -72,6 +79,10 @@ bool Matches(string record_symbol)
       chart = "XAUUSD";
    if(StringFind(chart, "SILVER") == 0)
       chart = "XAGUSD";
+   if(StringFind(chart, "BITCOIN") == 0 || StringFind(chart, "XBTUSD") == 0)
+      chart = "BTCUSD";
+   if(StringFind(chart, "ETHEREUM") == 0)
+      chart = "ETHUSD";
    if(chart == rec)
       return true;
    // broker suffix: EURUSDM, EURUSDSTD, NVDAUS - the record must be the start
@@ -234,7 +245,9 @@ void Panel()
    t += StringFormat("Updated %s UTC (%s)%s\n", g_meta_updated,
                      (age < 0 ? "?" : (age < 120 ? IntegerToString(age) + " min ago" : IntegerToString(age / 60) + " h ago")),
                      (age > InpStaleMin ? "  STALE - re-run mt5bridge.py" : ""));
-   if(g_meta_open)
+   if(IsCrypto())
+      t += "Crypto trades 24/7 (weekends too). Spreads widen and gaps happen when it is quiet.\n";
+   else if(g_meta_open)
       t += "FX open. Sessions: " + (g_meta_sessions == "" ? "between sessions (thin)" : g_meta_sessions) + "\n";
    else
       t += "FX closed. Opens " + g_meta_next + "\n";
@@ -259,7 +272,11 @@ void Panel()
          double pt = _Point;
          if(g_kind == "FX")
            {
-            if(StringFind(L, "XAU") == 0 || StringFind(L, "GOLD") == 0)
+            if(StringFind(L, "BTC") == 0 || StringFind(L, "XBT") == 0 || StringFind(L, "BITCOIN") == 0)
+               pt = 1.0;
+            else if(StringFind(L, "ETH") == 0)
+               pt = 0.1;
+            else if(StringFind(L, "XAU") == 0 || StringFind(L, "GOLD") == 0)
                pt = 0.1;
             else if(StringFind(L, "XAG") == 0 || StringFind(L, "SILVER") == 0)
                pt = 0.01;

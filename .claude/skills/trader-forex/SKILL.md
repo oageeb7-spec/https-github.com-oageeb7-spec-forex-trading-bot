@@ -45,6 +45,19 @@ Prices come from Stooq spot; if Stooq fails, Yahoo's front-month futures
 (GC=F, SI=F) are used and marked "futures, not spot". Many regulators cap
 gold leverage at 20:1, lower than currencies; set `max_leverage` to match.
 
+## Bitcoin and Ethereum (crypto CFDs)
+
+`BTCUSD` (or `bitcoin`, `BTC/USD`) and `ETHUSD` work in `quote`, `pips`, `plan`, `size`
+and `scan`; BTCUSD is in the default scan. Prices are Yahoo's BTC-USD / ETH-USD. A lot is
+1 coin, a "pip" is $1 on BTC and $0.10 on ETH, so a BTC stop of 3000 pips is $3,000 a coin.
+Crypto trades 24/7, weekends included, and the FX session clock does not apply.
+
+Crypto is **off by default**: scans and plans work, but `size --write` does not write a
+crypto order and `mt5.py` / `oanda.py` `check` and `send` block it until the user sets
+`"allow_crypto": true` in the `forex` section of `trader/config.json`. Leverage for crypto is
+capped separately by `crypto_max_leverage` (default 2, as many brokers cap crypto CFDs at 2:1).
+On MT5 the broker's name is found as BTCUSD, BITCOIN or XBTUSD.
+
 ## STARTRADER / MetaTrader 5 (sending orders)
 
 STARTRADER (startrader.com, regulated by CMA, FSCA, FSA and FSC) trades through

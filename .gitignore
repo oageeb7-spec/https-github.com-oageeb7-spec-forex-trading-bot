@@ -1,3 +1,4 @@
 trader/
 __pycache__/
 .venv/
+web/jarvis-mobile/dist/

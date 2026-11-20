@@ -41,6 +41,9 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
 - **Scanner:** majors and crosses for trend, 20-day breakouts, RSI and ATR in pips.
 
 - **Gold and silver:** XAUUSD / XAGUSD ("price of gold", "buy gold at 2650 stop 2635").
+- **Bitcoin and Ethereum:** BTCUSD / ETHUSD quotes, plans and scans (BTCUSD is in the default
+  scan and on the MT5 charts). Crypto orders stay off until you set `"allow_crypto": true` in the
+  `forex` section of `trader/config.json`; crypto leverage is capped at `crypto_max_leverage` (2:1).
 - **STARTRADER (MetaTrader 5):** read your account and positions ("my STARTRADER account"),
   and send a planned order with `/fxsend`: risk-checked against your real balance and the
   broker's live price, then sent only after you type yes, with stop-loss and take-profit
@@ -77,6 +80,21 @@ machine, position sizing, risk checks, tickets, alerts, earnings and Congress tr
 On first run JARVIS creates `trader/config.json` with starter rules ($5,000 budget, $50 max
 loss a trade, paper trading). Say "show my rules", or "set budget to 10000" / "set max loss to 100".
 Set `sec_user_agent` in that file to your name and email for the SEC (news, earnings).
+
+## JARVIS on your phone
+
+`web/jarvis-mobile/` is a phone page for JARVIS: forex, metals, crypto and stock scan signals with
+live daily data (through your CoinGecko and Alpha Vantage connectors), a Claude chat with the
+trader tools, and a position-size calculator. It never places orders.
+
+```bash
+python web/jarvis-mobile/build.py --scan    # rescan forex/crypto, fill the template -> web/jarvis-mobile/dist/jarvis.html
+```
+
+Run `scan.py daily` first for fresh stock hits. Then ask Claude to "republish JARVIS Mobile" from
+`dist/jarvis.html`; it is published as a private claude.ai artifact with the `mcp` (CoinGecko
+get-coin-market-chart; Alpha Vantage FX_DAILY, TIME_SERIES_DAILY) and `sample` capabilities, so the
+Live buttons and chat work. Alpha Vantage's free plan allows about 25 requests a day.
 
 **Safety:** JARVIS never places, approves or records orders. It can only *show* tickets;
 sending an order stays a manual step through `/trader-broker` in Claude Code.
