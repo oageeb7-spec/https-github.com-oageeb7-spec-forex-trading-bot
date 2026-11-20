@@ -70,6 +70,30 @@ balance**, block a price already past the stop or target, and run MT5's own
 `order_check`. A REAL account (not demo) also needs `MT5_ALLOW_LIVE=1`. Start on a
 STARTRADER demo account. Every attempt is logged in `trader/state/fx_broker.json`.
 
+## Signals on your MT5 charts (JarvisSignals indicator)
+
+`mt5bridge.py` puts the skills' results on any STARTRADER / MT5 chart. It writes
+`jarvis_signals.txt` to MT5's shared `Common\Files` folder; the indicator
+`mql5/JarvisSignals.mq5` reads it every 10 seconds and shows, for the chart's symbol:
+the FX session clock, the forex scan row (trend, RSI, ATR in pips, signals) or the
+stock scanner's setups, the plan's entry / stop / target as lines with the lot size
+and loss at the stop, and the 20-day high and low. It rings a pop-up (and, if you turn
+it on, a push to the MT5 phone app) once when the price reaches the entry, stop or
+target. Broker names are matched: EURUSD+, EURUSD.std, GOLD, #NVDA, NVDA.US.
+
+```bash
+python3 "${CLAUDE_SKILL_DIR}/mt5bridge.py" export --scan              # scan + write once
+python3 "${CLAUDE_SKILL_DIR}/mt5bridge.py" export --scan --every 15   # keep it fresh
+python3 "${CLAUDE_SKILL_DIR}/mt5bridge.py" where                      # where the file goes
+```
+
+Install once in MT5: File > Open Data Folder > `MQL5\Indicators`, copy
+`JarvisSignals.mq5` there, open it in MetaEditor (F4) and Compile (F7), then drag
+JarvisSignals from the Navigator onto a chart. It is an indicator, not an Expert
+Advisor: it cannot open, change or close a trade. Sending stays `/fxsend` with the
+user's typed yes, or a manual order in MT5. On Linux / macOS the file goes to
+`trader/mt5/` (copy it, or pass `--out`).
+
 ## OANDA (alternative)
 
 ```bash

@@ -126,6 +126,14 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "trader/fx_plan.json; `scan [EURUSD,GBPUSD]` = trend, 20-day breakouts, RSI, ATR in pips "
         "(default: majors and crosses). Gold and silver work as XAUUSD and XAGUSD.",
     ),
+    "mt5bridge": (
+        "trader-forex/mt5bridge.py",
+        {"export", "where"},
+        "Send the skills' results to MetaTrader 5 (STARTRADER) charts: writes the signals file the "
+        "JarvisSignals indicator reads (forex scan, stock scan hits, the current plan and lots). "
+        "`export` = write it from trader/*.json; `export --scan` = run the forex scan first; "
+        "`where` = the file's path. Never places an order.",
+    ),
     "fxbroker": (
         FX_BROKER_SCRIPT,
         {"account", "positions", "check", "preview"} | ({"symbol"} if FX_BROKER == "mt5" else set()),
@@ -278,6 +286,8 @@ def run_tool(name: str, args: list[str]) -> tuple[str, bool]:
     if subs is not None and not is_help:
         if not args or args[0] not in subs:
             return f"{name}: first arg must be one of {sorted(subs)}", True
+    if name == "mt5bridge" and "--every" in args:
+        return "mt5bridge: --every runs forever; run it yourself in a terminal instead.", True
     path = SKILLS / script
     if not path.exists():
         return f"Script missing: {path}", True
@@ -527,6 +537,9 @@ def route(text: str) -> list[tuple[str, list[str]]] | str:
     """Map a plain-English request to tool runs, or return a reply string."""
     t = text.lower()
     pairs = find_pairs(text)
+    if has(t, "(send|push|update|refresh|sync|signals?).*(mt5|metatrader|meta trader|chart)",
+           "(mt5|metatrader) (signals|indicator|bridge)", "jarvissignals"):
+        return [("mt5bridge", ["export", "--scan"])]
     if pairs or has(t, "forex", "\\bfx\\b", "currenc", "oanda", "startrader", "star trader",
                     "\\bmt5", "metatrader", "meta trader", "send .*broker", "send .*order", "forex order", "\\bpips?\\b", "how many lots", "lot size"):
         if not has(t, "set ", "change ", "update ", "my rules", "settings"):
