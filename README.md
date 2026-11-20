@@ -50,6 +50,17 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
   Works with any MT5 broker. Use OANDA instead with `JARVIS_FX_BROKER=oanda`
   (`OANDA_API_TOKEN`, `OANDA_ACCOUNT_ID`).
 
+### Signals on your MT5 charts
+
+`python .claude/skills/trader-forex/mt5bridge.py export --scan --every 15` (or ask JARVIS
+"send the signals to my MT5 charts") writes the forex scan, the stock scanner's hits and your
+current plan to MT5's shared Files folder. The **JarvisSignals** indicator
+(`.claude/skills/trader-forex/mql5/JarvisSignals.mq5`) shows them on every chart: session clock,
+scan result, entry / stop / target lines with lots and loss at the stop, and an alert (pop-up or
+MT5 phone push) when the price reaches a level. Install: MT5 > File > Open Data Folder >
+`MQL5/Indicators`, copy the file, compile it in MetaEditor (F7), drag it onto a chart.
+It is an indicator, so it can never trade; orders stay `/fxsend` with your typed yes.
+
 Try: "is forex open?", "price of EURUSD and cable", "scan the forex majors",
 "plan EURUSD buy at 1.0850 stop 1.0820 target 2R", "short GBPJPY stop 40 pips target 80 pips",
 "how many lots, 1% risk", "set forex account to 25000", "set leverage to 50".
