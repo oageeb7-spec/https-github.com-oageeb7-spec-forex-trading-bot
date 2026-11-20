@@ -124,7 +124,8 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "1.0820|pips:30 [--target 2R|pips:60|PRICE] --write` = trade plan (entry defaults to the "
         "latest rate); `size [--account 10000] [--risk-pct 1] --write` = lots from "
         "trader/fx_plan.json; `scan [EURUSD,GBPUSD]` = trend, 20-day breakouts, RSI, ATR in pips "
-        "(default: majors and crosses). Gold and silver work as XAUUSD and XAGUSD.",
+        "(default: majors, crosses, gold and BTCUSD). Gold and silver work as XAUUSD and XAGUSD; "
+        "crypto CFDs as BTCUSD and ETHUSD (sizing writes an order only if allow_crypto is on).",
     ),
     "mt5bridge": (
         "trader-forex/mt5bridge.py",
@@ -442,13 +443,13 @@ def has(text: str, *words: str) -> bool:
     return any(re.search(r"\b" + w, text) for w in words)
 
 
-FX_CCY = {"XAU", "XAG", "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK",
+FX_CCY = {"XAU", "XAG", "BTC", "ETH", "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK",
           "SGD", "HKD", "MXN", "ZAR", "TRY", "PLN", "CNH", "CNY", "INR"}
 FX_NAMES = {"cable": "GBPUSD", "fiber": "EURUSD", "fibre": "EURUSD", "euro": "EURUSD",
             "pound": "GBPUSD", "sterling": "GBPUSD", "yen": "USDJPY", "gopher": "USDJPY",
             "loonie": "USDCAD", "aussie": "AUDUSD", "kiwi": "NZDUSD", "swissie": "USDCHF",
             "franc": "USDCHF", "guppy": "GBPJPY", "geppy": "GBPJPY",
-            "gold": "XAUUSD", "silver": "XAGUSD"}
+            "gold": "XAUUSD", "silver": "XAGUSD", "bitcoin": "BTCUSD", "ethereum": "ETHUSD"}
 
 
 def find_pairs(text: str) -> list[str]:
@@ -458,7 +459,8 @@ def find_pairs(text: str) -> list[str]:
         spaced = re.search(r"\s", m.group(0)) is not None
         if spaced and not (m.group(1).isupper() and m.group(2).isupper()):
             continue  # "try usd" is not the lira; "TRY USD" or "tryusd" is
-        if a in FX_CCY and b in FX_CCY and a != b and b not in ("XAU", "XAG"):
+        if a in FX_CCY and b in FX_CCY and a != b and b not in ("XAU", "XAG", "BTC", "ETH") \
+                and (a not in ("BTC", "ETH") or b == "USD"):
             hits.append((m.start(), a + b))
     low = text.lower()
     for name, pair in FX_NAMES.items():

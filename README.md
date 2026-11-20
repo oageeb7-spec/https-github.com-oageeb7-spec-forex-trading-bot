@@ -41,6 +41,9 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
 - **Scanner:** majors and crosses for trend, 20-day breakouts, RSI and ATR in pips.
 
 - **Gold and silver:** XAUUSD / XAGUSD ("price of gold", "buy gold at 2650 stop 2635").
+- **Bitcoin and Ethereum:** BTCUSD / ETHUSD quotes, plans and scans (BTCUSD is in the default
+  scan and on the MT5 charts). Crypto orders stay off until you set `"allow_crypto": true` in the
+  `forex` section of `trader/config.json`; crypto leverage is capped at `crypto_max_leverage` (2:1).
 - **STARTRADER (MetaTrader 5):** read your account and positions ("my STARTRADER account"),
   and send a planned order with `/fxsend`: risk-checked against your real balance and the
   broker's live price, then sent only after you type yes, with stop-loss and take-profit

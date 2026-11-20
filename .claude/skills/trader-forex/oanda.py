@@ -121,11 +121,13 @@ def order_body(o: dict) -> dict:
 def risk_check(o: dict, cfg: dict, plan: dict | None, state: dict) -> list[str]:
     """Return the reasons to BLOCK (empty = PASS)."""
     problems = []
+    if fx.is_crypto(o.get("pair", "")) and not cfg.get("allow_crypto"):
+        problems.append("crypto is off (set \"allow_crypto\": true in the forex config to allow it)")
     if not o.get("stop_loss"):
         problems.append("no stop-loss")
     if not o.get("take_profit"):
         problems.append("no take-profit")
-    if int(o.get("units", 0)) <= 0:
+    if float(o.get("units", 0)) <= 0:
         problems.append("zero size")
     allowed = cfg["account_size"] * cfg["risk_pct"] / 100
     if cfg.get("max_loss_per_trade"):

@@ -43,16 +43,33 @@ METALS = {  # symbol: (contract size in oz per lot, pip size, decimals, Yahoo fu
 }
 
 
+CRYPTO = {  # symbol: (coins per lot, pip size, decimals, Yahoo symbol) - CFDs priced in USD
+    "BTC": (1, 1.0, 2, "BTC-USD"),
+    "ETH": (1, 0.1, 2, "ETH-USD"),
+}
+
+
 def contract(pair: str) -> int:
-    return METALS[pair[:3]][0] if pair[:3] in METALS else LOT
+    if pair[:3] in METALS:
+        return METALS[pair[:3]][0]
+    if pair[:3] in CRYPTO:
+        return CRYPTO[pair[:3]][0]
+    return LOT
 
 
 def is_metal(pair: str) -> bool:
     return pair[:3] in METALS
+
+
+def is_crypto(pair: str) -> bool:
+    return pair[:3] in CRYPTO
 DEFAULTS = {
     "account_size": 10000, "account_currency": "USD", "risk_pct": 1.0,
     "max_loss_per_trade": None, "max_leverage": 30, "min_reward_risk": 1.5,
     "min_lot_step": 0.01, "max_lots": 10,
+    # crypto (BTCUSD, ETHUSD): scans and plans always work; sizing and sending only
+    # when allow_crypto is true, with its own leverage cap (crypto CFDs are often 2:1)
+    "allow_crypto": False, "crypto_max_leverage": 2,
 }
 SESSIONS = [  # name, zone, local open, local close
     ("Sydney", "Australia/Sydney", 7, 16),
@@ -70,7 +87,13 @@ class FxError(Exception):
 
 def norm_pair(s: str) -> str:
     p = s.upper().replace("/", "").replace("_", "").replace("-", "").replace("=X", "").strip()
-    p = {"GOLD": "XAUUSD", "SILVER": "XAGUSD", "XAU": "XAUUSD", "XAG": "XAGUSD"}.get(p, p)
+    p = {"GOLD": "XAUUSD", "SILVER": "XAGUSD", "XAU": "XAUUSD", "XAG": "XAGUSD",
+         "BTC": "BTCUSD", "BITCOIN": "BTCUSD", "XBTUSD": "BTCUSD", "BTCUSDT": "BTCUSD",
+         "ETH": "ETHUSD", "ETHER": "ETHUSD", "ETHEREUM": "ETHUSD", "ETHUSDT": "ETHUSD"}.get(p, p)
+    if p[:3] in CRYPTO:
+        if p[3:] != "USD" or len(p) != 6:
+            raise FxError(f"crypto is priced in USD here: use {p[:3]}USD, not {s!r}")
+        return p
     base_ok = p[:3] in CURRENCIES or p[:3] in METALS
     if len(p) != 6 or not base_ok or p[3:] not in CURRENCIES or p[:3] == p[3:]:
         raise FxError(f"not a currency pair: {s!r} (use e.g. EURUSD, EUR/USD or XAUUSD)")
@@ -78,12 +101,16 @@ def norm_pair(s: str) -> str:
 
 
 def pip_size(pair: str) -> float:
+    if is_crypto(pair):
+        return CRYPTO[pair[:3]][1]
     if is_metal(pair):
         return METALS[pair[:3]][1]
     return 0.01 if pair[3:] == "JPY" else 0.0001
 
 
 def decimals(pair: str) -> int:
+    if is_crypto(pair):
+        return CRYPTO[pair[:3]][2]
     if is_metal(pair):
         return METALS[pair[:3]][2]
     return 3 if pair[3:] == "JPY" else 5
@@ -119,7 +146,12 @@ def _yahoo(pair: str, rng: str, offline: str | None) -> dict:
         last = None
         for host in ("query2.finance.yahoo.com", "query1.finance.yahoo.com"):
             try:
-                sym = METALS[pair[:3]][3] if is_metal(pair) and pair[3:] == "USD" else f"{pair}=X"
+                if is_crypto(pair):
+                    sym = CRYPTO[pair[:3]][3]
+                elif is_metal(pair) and pair[3:] == "USD":
+                    sym = METALS[pair[:3]][3]
+                else:
+                    sym = f"{pair}=X"
                 text = _get(f"https://{host}/v8/finance/chart/{sym}?range={rng}&interval=1d")
                 break
             except FxError as e:
@@ -415,32 +447,37 @@ def cmd_size(a) -> int:
     else:
         base_in_acct = rate(p[:3], acct, a.offline)
     notional_per_lot = contract(p) * base_in_acct
-    lots_lev = math.floor(account * cfg["max_leverage"] / notional_per_lot / step + 1e-9) * step
+    lev = cfg["crypto_max_leverage"] if is_crypto(p) else cfg["max_leverage"]
+    lots_lev = math.floor(account * lev / notional_per_lot / step + 1e-9) * step
     lots = min(lots_risk, lots_lev, cfg["max_lots"])
     binds = "max loss" if lots == lots_risk else ("leverage" if lots == lots_lev else "max lots")
     lots = round(lots, 2)
     loss = lots * plan["stop_pips"] * pv
     gain = lots * plan["target_pips"] * pv
-    margin = lots * notional_per_lot / cfg["max_leverage"]
+    margin = lots * notional_per_lot / lev
     print(f"{plan['side'].upper()} {p[:3]}/{p[3:]}  entry {fmt(p, plan['entry'])}  stop {fmt(p, plan['stop'])} "
           f"({plan['stop_pips']} pips)  target {fmt(p, plan['target'])} ({plan['target_pips']} pips)")
     print(f"Account {account:,.2f} {acct}, risk {risk_pct}% = {max_loss:,.2f} {acct} max loss.")
     print(f"Pip value {pv:.2f} {acct} per lot.")
     print(f"  by max loss   {max_loss:,.2f} / ({plan['stop_pips']} pips x {pv:.2f})  = {lots_risk:.2f} lots")
-    print(f"  by leverage   {cfg['max_leverage']}:1 on {account:,.0f}                        = {lots_lev:.2f} lots")
+    print(f"  by leverage   {lev}:1 on {account:,.0f}                        = {lots_lev:.2f} lots")
     print(f"  max lots      {cfg['max_lots']}")
     if lots <= 0:
         print(f"Size: 0 lots. The stop is too wide for a {max_loss:,.2f} {acct} max loss even at "
               f"{step} lots. Tighten the stop or raise the risk.")
         return 1
-    unit_name = "oz" if is_metal(p) else "units"
-    print(f"Size: {lots:.2f} lots = {int(round(lots * contract(p))):,} {unit_name}  (limit: {binds})")
+    unit_name = "oz" if is_metal(p) else (p[:3] if is_crypto(p) else "units")
+    units = round(lots * contract(p), 4) if is_crypto(p) else int(round(lots * contract(p)))
+    print(f"Size: {lots:.2f} lots = {units:,} {unit_name}  (limit: {binds})")
     print(f"  Loss at stop  {loss:,.2f} {acct}    Gain at target {gain:,.2f} {acct}    "
-          f"Margin ~{margin:,.2f} {acct} at {cfg['max_leverage']}:1")
-    order = {"pair": p, "side": plan["side"], "units": int(round(lots * contract(p))), "lots": lots,
+          f"Margin ~{margin:,.2f} {acct} at {lev}:1")
+    order = {"pair": p, "side": plan["side"], "units": units, "lots": lots,
              "type": "market", "stop_loss": plan["stop"], "take_profit": plan["target"],
              "max_loss": round(loss, 2), "account_currency": acct}
-    if a.write:
+    if a.write and is_crypto(p) and not cfg.get("allow_crypto"):
+        print("Crypto order NOT written: crypto is off. To allow it, set \"allow_crypto\": true in the "
+              "forex section of trader/config.json (your decision). Crypto trades 24/7 and gaps hard.")
+    elif a.write:
         os.makedirs(os.path.dirname(a.write) or ".", exist_ok=True)
         json.dump({"orders": [order]}, open(a.write, "w"), indent=2)
         print(f"Wrote proposed order to {a.write}. Nothing was placed.")
@@ -511,7 +548,7 @@ def analyse(pair: str, bars: list[dict]) -> dict:
 
 
 def cmd_scan(a) -> int:
-    pairs = [norm_pair(x) for x in (a.pairs.split(",") if a.pairs else MAJORS + CROSSES + ["XAUUSD"])]
+    pairs = [norm_pair(x) for x in (a.pairs.split(",") if a.pairs else MAJORS + CROSSES + ["XAUUSD", "BTCUSD"])]
     rows, errs = [], []
     for p in pairs:
         try:

@@ -91,6 +91,10 @@ def resolve_symbol(pair: str) -> str:
             aliases += ["GOLD"]
         if pair == "XAGUSD":
             aliases += ["SILVER"]
+        if pair == "BTCUSD":
+            aliases += ["BITCOIN", "XBTUSD"]
+        if pair == "ETHUSD":
+            aliases += ["ETHEREUM"]
         cands = [s.name for s in (m.symbols_get() or [])
                  if any(s.name.upper().startswith(a) for a in aliases)]
         if not cands:
@@ -143,6 +147,8 @@ def request(o: dict, n: dict) -> dict:
 
 def check_order(o: dict, n: dict, cfg: dict, plan: dict | None, state: dict, acct) -> list[str]:
     problems = []
+    if fx.is_crypto(o.get("pair", "")) and not cfg.get("allow_crypto"):
+        problems.append("crypto is off (set \"allow_crypto\": true in the forex config to allow it)")
     if not o.get("stop_loss") or not o.get("take_profit"):
         problems.append("stop-loss and take-profit are both required")
     info = n["info"]
