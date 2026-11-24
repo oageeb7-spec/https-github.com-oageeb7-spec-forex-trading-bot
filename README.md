@@ -96,14 +96,15 @@ Set `sec_user_agent` in that file to your name and email for the SEC (news, earn
 ## JARVIS on your phone
 
 `web/jarvis-mobile/` is a phone page for JARVIS: forex, metals, crypto and stock scan signals with
-live daily data (through your CoinGecko and Alpha Vantage connectors), a Claude chat with the
-trader tools, and a position-size calculator. It never places orders.
+live daily data (through your CoinGecko and Alpha Vantage connectors), a **Bots** tab that runs the grid,
+DCA and RSI strategies with backtests on a year of daily bars (tweak the settings on the phone), a Claude
+chat with the trader tools, and a position-size calculator. It never places orders.
 
 ```bash
 python web/jarvis-mobile/build.py --scan    # rescan forex/crypto, fill the template -> web/jarvis-mobile/dist/jarvis.html
 ```
 
-Run `scan.py daily` first for fresh stock hits. Then ask Claude to "republish JARVIS Mobile" from
+Run `scan.py daily` first for fresh stock hits (or pass `--stocks-from OLD.html` to keep an earlier page's stock list). Then ask Claude to "republish JARVIS Mobile" from
 `dist/jarvis.html`; it is published as a private claude.ai artifact with the `mcp` (CoinGecko
 get-coin-market-chart; Alpha Vantage FX_DAILY, TIME_SERIES_DAILY) and `sample` capabilities, so the
 Live buttons and chat work. Alpha Vantage's free plan allows about 25 requests a day.

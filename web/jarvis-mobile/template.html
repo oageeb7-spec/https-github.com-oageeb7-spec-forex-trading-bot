@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
-/* Layout: one-column phone console. Sticky clock header, a scrolling view, a fixed bottom tab bar (Signals / Ask / Plan). */
+/* Layout: one-column phone console. Sticky clock header, a scrolling view, a fixed bottom tab bar (Signals / Bots / Ask / Plan). */
 :root{
   --bg:#eef1f4; --surface:#ffffff; --surface-2:#f6f8fa; --line:#d8dee5;
   --ink:#13202d; --muted:#5a6878; --accent:#0a6c8f; --accent-ink:#ffffff;
@@ -111,6 +111,18 @@ svg.spark{width:100%;height:56px;display:block}
 .warnbox{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px}
 h2{font:700 15px var(--f-display);letter-spacing:.04em;margin:0 0 10px}
 
+/* Bots */
+.form label.off{display:none}
+.tbl{display:flex;flex-direction:column;font:12.5px var(--f-mono);font-variant-numeric:tabular-nums}
+.tr{display:grid;grid-template-columns:var(--cols);gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.tr:last-child{border-bottom:0}
+.tr>span:not(:first-child){text-align:right}
+.tr.th{font:600 11px var(--f-body);color:var(--muted);letter-spacing:.02em}
+.tr .more{grid-column:1/-1;text-align:left!important;font:12px var(--f-body);color:var(--muted);margin-top:-2px}
+.pos{color:var(--up)} .neg{color:var(--down)}
+.stack .kv b{white-space:nowrap}
+.stack{display:flex;flex-direction:column;gap:12px}
+
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 nav.tabs .wrap{display:flex}
 nav.tabs button{flex:1;border:0;background:none;padding:9px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
@@ -150,6 +162,7 @@ nav.tabs button[aria-selected="true"]{color:var(--accent)}
         <button>Which forex pairs broke out?</button>
         <button>Is forex open now?</button>
         <button>Size EURUSD buy, 30 pip stop, $10k, 1%</button>
+        <button>Backtest the RSI bot on gold</button>
       </div>
     </div>
     <div class="ask-pad"></div>
@@ -186,6 +199,65 @@ nav.tabs button[aria-selected="true"]{color:var(--accent)}
     </div>
     <p class="note">Forex lots are 100,000 units, gold 100 oz, silver 5,000 oz, crypto 1 coin, stocks whole shares. Leverage caps: 30:1 forex and metals, 2:1 crypto. Spread, swap and slippage are not included. To send an order use <b>/fxsend</b> in JARVIS on your PC, with your own typed yes.</p>
   </section>
+
+  <section class="view" id="v-bots" hidden>
+    <div class="seg" role="group" aria-label="Strategy" id="bSeg">
+      <button data-s="grid" aria-pressed="true">Grid</button>
+      <button data-s="dca" aria-pressed="false">DCA</button>
+      <button data-s="rsi" aria-pressed="false">RSI</button>
+    </div>
+    <p class="summary" id="bDesc"></p>
+    <div class="card">
+      <form class="form" id="botForm" autocomplete="off">
+        <label>Symbol
+          <input id="bSym" list="botList" value="EURUSD" spellcheck="false" autocapitalize="characters">
+          <datalist id="botList"></datalist>
+        </label>
+        <label>Lots per order
+          <input id="bLots" type="number" inputmode="decimal" value="0.01" min="0" step="any">
+        </label>
+        <label data-for="grid">Low (bottom line)
+          <input id="bLow" type="number" inputmode="decimal" step="any">
+        </label>
+        <label data-for="grid">High (top line)
+          <input id="bHigh" type="number" inputmode="decimal" step="any">
+        </label>
+        <label data-for="grid" class="full">Grid lines
+          <input id="bLevels" type="number" inputmode="numeric" value="10" min="2" step="1">
+        </label>
+        <label data-for="dca">Side
+          <select id="bSide"><option value="buy">Buy (long)</option><option value="sell">Sell (short)</option></select>
+        </label>
+        <label data-for="dca">Take profit (%)
+          <input id="bTp" type="number" inputmode="decimal" value="0.5" min="0" step="any">
+        </label>
+        <label data-for="dca">Stop-loss (%)
+          <input id="bSl" type="number" inputmode="decimal" placeholder="none" min="0" step="any">
+        </label>
+        <label data-for="dca">Safety orders
+          <input id="bSafety" value="0.5:0.01,1:0.02" spellcheck="false" placeholder="deviation%:lots, …">
+        </label>
+        <label data-for="rsi">RSI period
+          <input id="bPer" type="number" inputmode="numeric" value="14" min="2" step="1">
+        </label>
+        <label data-for="rsi">Persistence (candles)
+          <input id="bPers" type="number" inputmode="numeric" value="1" min="1" step="1">
+        </label>
+        <label data-for="rsi">Buy below
+          <input id="bRlo" type="number" inputmode="decimal" value="30" min="0" max="100" step="any">
+        </label>
+        <label data-for="rsi">Sell above
+          <input id="bRhi" type="number" inputmode="decimal" value="70" min="0" max="100" step="any">
+        </label>
+        <label data-for="rsi" class="full">Mode
+          <select id="bMode"><option value="long">Long only: buy on low, close on high</option><option value="both">Both ways: also go short on high</option></select>
+        </label>
+      </form>
+      <div class="actions" style="margin-top:12px"><button class="btn primary" id="bLive" type="button">Live bars</button><span class="src" id="bSrc" style="align-self:center"></span></div>
+    </div>
+    <div class="stack" id="bOut" style="margin-top:12px"></div>
+    <p class="note">Grid, DCA and RSI strategies ported from OpenTrader (Apache-2.0), the same maths as <b>strategies.py</b> in JARVIS on your PC. Backtests replay daily bars, fill at the exact level, take the stop when a bar touches stop and target, and leave out spread, swap and slippage. Past results don't predict the future. Nothing here places an order. Not financial advice.</p>
+  </section>
 </main>
 
 <div class="composer" id="composer" hidden>
@@ -198,6 +270,7 @@ nav.tabs button[aria-selected="true"]{color:var(--accent)}
 <nav class="tabs" role="tablist">
   <div class="wrap">
     <button role="tab" data-v="signals" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Signals</button>
+    <button role="tab" data-v="bots" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M8 4v16"/></svg>Bots</button>
     <button role="tab" data-v="ask" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Ask</button>
     <button role="tab" data-v="plan" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M6 16V9M11 16V5M16 16v-4"/></svg>Plan</button>
   </div>
@@ -268,7 +341,7 @@ async function fetchLive(p,{refresh=false}={}){
   else {res=await mcp.callTool(AV,"TIME_SERIES_DAILY",{symbol:p,datatype:"json"},opt);bars=avSeries(res.payload,"Time Series (Daily)");srcName="Alpha Vantage, daily bars"}
   if(bars.length<25)throw {code:"tool_error",message:"Not enough history to read the chart"};
   const a=analyse(p,bars),at=(res.cache&&res.cache.storedAt)||Date.now();
-  live[p]={a,src:srcName,at,err:null};return live[p];
+  live[p]={a,src:srcName,at,err:null,bars};return live[p];
 }
 function errCopy(e,p){
   const k=kind(p),srv=k==="crypto"?CG:"Alpha Vantage";
@@ -326,7 +399,7 @@ function filtersFor(g){if(g==="stocks")return [["all","All"],["20-day breakout",
 function renderSignals(){
   const rows=rowsFor(group).map(current).filter(r=>filter==="all"||r.sig.some(s=>s.includes(filter)));
   const sm=document.getElementById("summary");sm.textContent="";
-  if(group==="stocks")sm.append(h("b",null,SNAP.counts.hits+" of "+SNAP.counts.liquid.toLocaleString()),` liquid US stocks matched a rule (of ${SNAP.counts.universe.toLocaleString()} scanned). Showing the most traded ${SNAP.stocks.length}.`);
+  if(group==="stocks")sm.append(h("b",null,SNAP.counts.hits+" of "+SNAP.counts.liquid.toLocaleString()),` liquid US stocks matched a rule (of ${SNAP.counts.universe.toLocaleString()} scanned). Showing the most traded ${SNAP.stocks.length}.`+(SNAP.stocksAsofLabel&&SNAP.stocksAsofLabel!==SNAP.asofLabel?` Stock scan: ${SNAP.stocksAsofLabel}.`:""));
   else sm.append(h("b",null,String(rowsFor(group).length)),group==="crypto"?" coins. Crypto trades all week.":" pairs and metals, daily bars.");
   const fb=document.getElementById("filters");fb.textContent="";
   filtersFor(group).forEach(([v,l])=>fb.append(h("button",{"aria-pressed":String(filter===v),onclick:()=>{filter=v;renderSignals()}},l)));
@@ -412,7 +485,7 @@ function plan(){
 // ---------------------------------------------------------------- Ask (Claude through the sample capability)
 let sampleP=null; function getSample(){if(!sampleP)sampleP=(window.claude&&window.claude.use)?window.claude.use("sample").catch(()=>null):Promise.resolve(null);return sampleP}
 const RULES=`You are JARVIS, a trading assistant on a phone screen. Answer in short plain text (no markdown tables, no headings), under 120 words unless asked for more.
-Use the tools for every number: get_signal for a symbol's trend/RSI/20-day range/ATR (it tries live data, else the snapshot), list_scan for the latest scan, market_clock for what is open, position_size for lots or shares. Say where the data came from (live connector or the ${SNAP.asofLabel} snapshot) and that it is delayed.
+Use the tools for every number: get_signal for a symbol's trend/RSI/20-day range/ATR (it tries live data, else the snapshot), list_scan for the latest scan, market_clock for what is open, position_size for lots or shares, run_strategy for the grid, DCA or RSI bot (levels or signal now, plus a backtest). Say where the data came from (live connector or the ${SNAP.asofLabel} snapshot) and that it is delayed.
 Rules: describe matched rules, never call anything a buy, a sell, a winner or a good trade, and never predict prices. You cannot place orders; if asked, say orders are sent from JARVIS on the PC with /fxsend and the user's own typed yes. Crypto orders are off there until allow_crypto is set. Not financial advice.`;
 const TOOLS=[
   {name:"get_signal",description:"Daily-chart reading for one symbol (EURUSD, XAUUSD, BTCUSD, ETHUSD or a US stock ticker): price, trend, RSI 14, 20-day high/low, ATR, matched rules, and the data source. Tries live connector data first, then the snapshot.",
@@ -428,7 +501,10 @@ const TOOLS=[
   {name:"market_clock",description:"What is open right now: forex (and which sessions), NYSE, crypto. No input.",execute(){return clock()}},
   {name:"position_size",description:"Size a trade: lots for forex/metals/crypto or shares for stocks, from entry, stop, account size (USD) and risk percent. Returns size, loss at stop, gain at target, margin.",
    inputSchema:{type:"object",properties:{symbol:{type:"string"},side:{type:"string",enum:["buy","sell"]},entry:{type:"number"},stop:{type:"number"},account:{type:"number"},risk_pct:{type:"number"},target_r:{type:"number"}},required:["symbol","entry","stop"]},
-   execute(i){const s=sizePosition(i);if(s.error)throw new Error(s.error);return s}}];
+   execute(i){const s=sizePosition(i);if(s.error)throw new Error(s.error);return s}},
+  {name:"run_strategy",description:"Run a bot strategy ported from OpenTrader on daily bars (live connector bars if fetched, else the snapshot's year of bars) for a forex pair, metal or BTCUSD/ETHUSD. strategy: grid (needs low, high, levels), dca (side, tp_pct, sl_pct, safety like '0.5:0.01,1:0.02'), or rsi (periods, low, high, persistence, mode long|both). Returns the levels or signal now and a paper backtest in USD for the given lots. Missing grid range defaults to the 20-day low/high.",
+   inputSchema:{type:"object",properties:{strategy:{type:"string",enum:["grid","dca","rsi"]},symbol:{type:"string"},lots:{type:"number"},low:{type:"number"},high:{type:"number"},levels:{type:"number"},side:{type:"string",enum:["buy","sell"]},tp_pct:{type:"number"},sl_pct:{type:"number"},safety:{type:"string"},periods:{type:"number"},persistence:{type:"number"},mode:{type:"string",enum:["long","both"]}},required:["strategy","symbol"]},
+   execute(i){const r=runStrategy(i.strategy,norm(i.symbol),{lots:i.lots,low:i.low,high:i.high,levels:i.levels,side:i.side,tp:i.tp_pct,sl:i.sl_pct,safety:i.safety,periods:i.periods,rlo:i.low,rhi:i.high,pers:i.persistence,mode:i.mode});return briefStrategy(r)}}];
 const turns=[];let asking=null;
 function chatAdd(cls,text){const c=document.getElementById("chat");const m=h("div",{class:"msg "+cls});if(cls==="bot")m.append(h("span",{class:"who"},"JARVIS"));const t=h("span",null,text);m.append(t);c.append(m);m.scrollIntoView({block:"end",behavior:"smooth"});return t}
 async function ask(text){
@@ -451,9 +527,154 @@ async function ask(text){
 }
 function setSend(){const b=document.getElementById("send");b.textContent=asking?"Stop":"Send"}
 
+// ---------------------------------------------------------------- bot strategies (port of trader-forex strategies.py, after OpenTrader's templates)
+const BARS={};Object.entries(SNAP.bars||{}).forEach(([s,a])=>BARS[s]=a.map(x=>({d:x[0],o:x[1],h:x[2],l:x[3],c:x[4]})));
+const hiB=b=>b.h??b.c, loB=b=>b.l??b.c, opB=b=>b.o??b.c;
+function barsFor(p){const L=live[p];if(L&&L.bars&&L.bars.length>=30)return {bars:L.bars,src:"live: "+L.src+", last bar "+L.bars[L.bars.length-1].d};
+  const b=BARS[p];return b&&b.length?{bars:b,src:`snapshot ${SNAP.asofLabel}, ${b.length} daily bars`}:null}
+function pvLot(p){const q=usdPer(p.slice(3));return q==null?null:contract(p)*pip(p)*q} // USD per pip per lot
+function gridLines(lo,hi,n){if(!(n>=2))throw new Error("A grid needs at least 2 lines.");if(!(hi>lo))throw new Error("The high must be above the low.");const st=(hi-lo)/(n-1);return Array.from({length:n},(_,i)=>lo+st*i)}
+function waitingLine(L,i,p){const d=x=>+Math.abs(p-x).toFixed(10),di=d(L[i]);if(i>0&&d(L[i-1])<di)return false;if(i+1<L.length&&d(L[i+1])<=di)return false;return true}
+function gridLevels(L,p){const o=[];for(let i=0;i<L.length-1;i++)o.push({buy:L[i],sell:L[i+1],filled:L[i]>p||waitingLine(L,i,p)});return o}
+function gridBacktest(bars,L){const start=bars[0].c,lv=gridLevels(L,start),held=lv.map(x=>({open:x.filled?start:null,bar:-1}));
+  let real=0,rounds=0,maxHeld=held.filter(x=>x.open!=null).length,peak=0,dd=0;const eq=[0];
+  for(let k=1;k<bars.length;k++){const b=bars[k];
+    lv.forEach((x,i)=>{const s=held[i];if(s.open==null){if(loB(b)<=x.buy&&s.bar!==k){s.open=Math.min(x.buy,opB(b));s.bar=k}}
+      else if(hiB(b)>=x.sell&&s.bar!==k){real+=Math.max(x.sell,opB(b))-s.open;rounds++;s.open=null;s.bar=k}});
+    maxHeld=Math.max(maxHeld,held.filter(x=>x.open!=null).length);
+    const e=real+held.reduce((a,s)=>a+(s.open!=null?b.c-s.open:0),0);peak=Math.max(peak,e);dd=Math.min(dd,e-peak);eq.push(e)}
+  const last=bars[bars.length-1].c;return {real,unreal:held.reduce((a,s)=>a+(s.open!=null?last-s.open:0),0),rounds,maxHeld,openNow:held.filter(x=>x.open!=null).length,dd,eq}}
+function parseSafety(s){return String(s||"").split(",").map(x=>x.trim()).filter(Boolean).map(x=>{const[a,b]=x.split(":").map(Number);
+  if(!(a>0)||!(b>0))throw new Error(`Safety orders are deviation%:lots pairs like 0.5:0.01, not "${x}".`);return [a,b]}).sort((a,b)=>a[0]-b[0])}
+function dcaLadder(entry,lots,side,tp,sl,saf){if(sl&&saf.length&&sl<=saf[saf.length-1][0])throw new Error("The stop-loss must sit beyond the deepest safety order (OpenTrader rule).");
+  let cost=entry*lots,size=lots;const rows=[{name:"Entry",price:entry,lots,total:size,avg:entry,tp:entry*(1+side*tp/100)}];
+  saf.forEach(([d,q],i)=>{const p=entry*(1-side*d/100);cost+=p*q;size+=q;const avg=cost/size;rows.push({name:"Safety "+(i+1),price:p,lots:q,total:size,avg,tp:avg*(1+side*tp/100)})});return rows}
+function dcaBacktest(bars,side,lots,tp,sl,saf){const trades=[];let pos=null,real=0,peak=0,dd=0;const eq=[];
+  for(let k=0;k<bars.length;k++){const b=bars[k];let closed=false;
+    if(pos){const adv=side>0?loB(b):hiB(b),fav=side>0?hiB(b):loB(b);
+      pos.pending=pos.pending.filter(so=>{if((adv-so.price)*side<=0){pos.cost+=so.price*so.lots;pos.size+=so.lots;pos.fills++;return false}return true});
+      const avg=pos.cost/pos.size,t=avg*(1+side*tp/100);let ex=null,why="";
+      if(pos.sl!=null&&(adv-pos.sl)*side<=0){ex=pos.sl;why="stop"}else if(pos.k!==k&&(fav-t)*side>=0){ex=t;why="target"}
+      if(ex!=null){const pnl=(ex-avg)*side*pos.size;real+=pnl;trades.push({open:bars[pos.k].d,close:b.d,why,fills:pos.fills,pnl});pos=null;closed=true}}
+    if(!pos&&!closed){const e=b.c;pos={k,cost:e*lots,size:lots,fills:0,sl:sl?e*(1-side*sl/100):null,pending:saf.map(([d,q])=>({price:e*(1-side*d/100),lots:q}))}}
+    const e=real+(pos?(b.c-pos.cost/pos.size)*side*pos.size:0);peak=Math.max(peak,e);dd=Math.min(dd,e-peak);eq.push(e)}
+  return {trades,real,unreal:pos?(bars[bars.length-1].c-pos.cost/pos.size)*side*pos.size:0,dd,eq,open:!!pos}}
+function rsiSeries(c,n){const o=Array(c.length).fill(null);if(c.length<=n)return o;let g=0,l=0;for(let i=1;i<=n;i++){const d=c[i]-c[i-1];g+=Math.max(d,0);l+=Math.max(-d,0)}
+  g/=n;l/=n;o[n]=l===0?100:100-100/(1+g/l);for(let i=n+1;i<c.length;i++){const d=c[i]-c[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n;o[i]=l===0?100:100-100/(1+g/l)}return o}
+function rsiSignals(rs,lo,hi,per){let tr={dir:"none",dur:0,adv:false};return rs.map(r=>{if(r==null||(r<=hi&&r>=lo))return null;const d=r>hi?"high":"low";
+  if(tr.dir!==d)tr={dir:d,dur:0,adv:false};tr.dur++;if(tr.dur>=per&&!tr.adv){tr.adv=true;return d==="high"?"sell":"buy"}return null})}
+function rsiBacktest(bars,sig,mode){const trades=[];let pos=null,real=0,peak=0,dd=0;const eq=[];
+  bars.forEach((b,i)=>{const px=b.c,s=sig[i];
+    if(s==="buy"){if(pos&&pos.side<0){real+=pos.px-px;trades.push({side:"short",open:pos.d,close:b.d,diff:pos.px-px});pos=null}if(!pos)pos={side:1,px,d:b.d}}
+    else if(s==="sell"){if(pos&&pos.side>0){real+=px-pos.px;trades.push({side:"long",open:pos.d,close:b.d,diff:px-pos.px});pos=null}if(!pos&&mode==="both")pos={side:-1,px,d:b.d}}
+    const e=real+(pos?(px-pos.px)*pos.side:0);peak=Math.max(peak,e);dd=Math.min(dd,e-peak);eq.push(e)});
+  const last=bars[bars.length-1].c;return {trades,real,unreal:pos?(last-pos.px)*pos.side:0,dd,eq,open:pos}}
+const num=(v,d)=>{const x=parseFloat(v);return isFinite(x)?x:d};
+function runStrategy(strat,p,o){
+  if(!p||kind(p)==="stock")throw new Error("The bots run on forex pairs, gold, silver, BTCUSD and ETHUSD.");
+  const B=barsFor(p);if(!B)throw new Error(`No bars for ${label(p)} in the snapshot. Tap Live bars to load them through your connector.`);
+  const bars=B.bars,price=bars[bars.length-1].c,lots=num(o.lots,0.01),pv=pvLot(p);if(!(lots>0))throw new Error("Lots must be above zero.");
+  if(pv==null)throw new Error(`No USD rate for ${p.slice(3)} to value a pip.`);
+  const usd=diff=>diff/pip(p)*pv; // price difference x lots -> USD
+  const base={strat,p,src:B.src,price,lots,from:bars[0].d,to:bars[bars.length-1].d,n:bars.length,usd};
+  if(strat==="grid"){const prior=bars.slice(-21,-1);let lo=num(o.low,NaN),hi=num(o.high,NaN);
+    if(!isFinite(lo))lo=Math.min(...prior.map(loB));if(!isFinite(hi))hi=Math.max(...prior.map(hiB));
+    const L=gridLines(lo,hi,Math.round(num(o.levels,10))),lv=gridLevels(L,price),bt=gridBacktest(bars,L);
+    const worst=lv.reduce((a,x)=>a+(x.buy-lo),0)*lots;return {...base,lo,hi,L,lv,step:L[1]-L[0],bt,worst}}
+  if(strat==="dca"){const side=o.side==="sell"?-1:1,tp=num(o.tp,0.5),sl=num(o.sl,NaN),saf=parseSafety(o.safety);if(!(tp>0))throw new Error("Take profit must be above 0%.");
+    const slv=isFinite(sl)&&sl>0?sl:null,rows=dcaLadder(price,lots,side,tp,slv,saf),bt=dcaBacktest(bars,side,lots,tp,slv,saf);return {...base,side,tp,sl:slv,saf,rows,bt}}
+  const per=Math.round(num(o.periods,14)),rlo=num(o.rlo,30),rhi=num(o.rhi,70),pers=Math.max(1,Math.round(num(o.pers,1))),mode=o.mode==="both"?"both":"long";
+  if(!(rlo<rhi))throw new Error("Buy-below must be lower than sell-above.");
+  const rs=rsiSeries(bars.map(b=>b.c),per),sig=rsiSignals(rs,rlo,rhi,pers),bt=rsiBacktest(bars,sig,mode);
+  const now=rs[rs.length-1];if(now==null)throw new Error("Not enough bars for that RSI period.");
+  let streak=0;for(let i=rs.length-1;i>=0;i--){const r=rs[i];if(r==null||!((now>rhi&&r>rhi)||(now<rlo&&r<rlo)))break;streak++}
+  let lastSig=null;for(let i=sig.length-1;i>=0;i--)if(sig[i]){lastSig={d:bars[i].d,s:sig[i]};break}
+  return {...base,per,rlo,rhi,pers,mode,rs,now,streak,sigNow:sig[sig.length-1],lastSig,bt};
+}
+function briefStrategy(r){const bt=r.bt,u=r.usd,out={strategy:r.strat,symbol:r.p,data:r.src,price:r.price,lots:r.lots,backtest_period:`${r.from} to ${r.to} (${r.n} daily bars)`,
+    backtest:{realized_usd:+u(bt.real).toFixed(2),open_usd:+u(bt.unreal).toFixed(2),worst_drawdown_usd:+u(bt.dd).toFixed(2)},caveat:"Paper replay: no spread, swap or slippage."};
+  if(r.strat==="grid"){out.range=[r.lo,r.hi];out.step_pips=+(r.step/pip(r.p)).toFixed(1);out.bought_at_start=r.lv.filter(x=>x.filled).length;out.waiting=r.lv.filter(x=>!x.filled).length;
+    Object.assign(out.backtest,{completed_levels:bt.rounds,still_held:bt.openNow,most_held:bt.maxHeld});out.open_loss_if_price_falls_to_low_usd=+u(r.worst).toFixed(2);out.backtest.realized_usd=+u(bt.real*r.lots).toFixed(2);out.backtest.open_usd=+u(bt.unreal*r.lots).toFixed(2);out.backtest.worst_drawdown_usd=+u(bt.dd*r.lots).toFixed(2)}
+  else if(r.strat==="dca"){out.ladder=r.rows.map(x=>({order:x.name,price:x.price,total_lots:x.total,average:x.avg,take_profit:x.tp}));
+    const w=bt.trades.filter(t=>t.why==="target").length;Object.assign(out.backtest,{trades:bt.trades.length,targets:w,stops:bt.trades.length-w})}
+  else{Object.assign(out,{rsi_now:+r.now.toFixed(1),zone_streak:r.streak,signal_on_last_candle:r.sigNow,last_signal:r.lastSig});const w=bt.trades.filter(t=>t.diff>0).length;
+    Object.assign(out.backtest,{trades:bt.trades.length,winners:w,realized_usd:+u(bt.real*r.lots).toFixed(2),open_usd:+u(bt.unreal*r.lots).toFixed(2),worst_drawdown_usd:+u(bt.dd*r.lots).toFixed(2)})}
+  return out}
+
+let strat="grid";
+const BOT_DESC={grid:"Equal steps from low to high. Each line buys and takes profit at the next line up; lines above the price (and the nearest one) are bought at the start, the rest wait. Long only, no stop.",
+  dca:"An entry plus safety orders further against you. The take-profit is measured from the average price, so it moves closer after each fill. When a trade closes, a new one opens.",
+  rsi:"RSI above the sell line for N candles gives one sell; below the buy line gives one buy. Long only closes on the sell; both ways also goes short."};
+const sMoney=x=>x==null||!isFinite(x)?"–":(x<0?"−":"+")+money(Math.abs(x));
+const cls=x=>x>0?"pos":x<0?"neg":"";
+function tbl(cols,head,rows){const t=h("div",{class:"tbl"});t.style.setProperty("--cols",cols);t.append(h("div",{class:"tr th"},...head.map(x=>h("span",null,x))));rows.forEach(r=>t.append(r));return t}
+function kvBox(pairs){const kv=h("div",{class:"kv"});pairs.forEach(([a,b,c])=>kv.append(h("div",null,h("span",null,a),h("b",{class:"mono "+(c||"")},b))));return kv}
+function eqSpark(eq){const s=spark(eq);if(s)s.setAttribute("aria-label","Backtest equity curve");return s}
+function bv(id){return document.getElementById(id).value}
+function renderBots(){
+  document.querySelectorAll("#botForm label[data-for]").forEach(l=>l.classList.toggle("off",l.dataset.for!==strat));
+  document.getElementById("bDesc").textContent=BOT_DESC[strat];
+  const out=document.getElementById("bOut"),src=document.getElementById("bSrc");out.textContent="";
+  const p=norm(bv("bSym"));let r;
+  try{r=runStrategy(strat,p,{lots:bv("bLots"),low:bv("bLow"),high:bv("bHigh"),levels:bv("bLevels"),side:bv("bSide"),tp:bv("bTp"),sl:bv("bSl"),safety:bv("bSafety"),periods:bv("bPer"),rlo:bv("bRlo"),rhi:bv("bRhi"),pers:bv("bPers"),mode:bv("bMode")})}
+  catch(e){src.textContent="";out.append(h("div",{class:"warnbox"},e.message));return}
+  const L=live[p];src.className="src"+(L&&L.err?" err":"");src.textContent=L&&L.err?L.err:r.src;
+  const u=r.usd,bt=r.bt,now=h("div",{class:"card"}),back=h("div",{class:"card"});
+  if(r.strat==="grid"){
+    const per=u(r.step*r.lots);
+    now.append(h("h2",null,`Grid now · ${label(p)} ${fmt(p,r.price)}`),
+      h("p",{class:"src"},`${r.L.length} lines, step ${fmt(p,r.step)} = ${(r.step/pip(p)).toFixed(1)} pips, ${money(per)} per completed level at ${r.lots} lots.`),
+      tbl("2.2em 1fr 1fr auto",["#","Buy","Take profit","Status"],r.lv.map((x,i)=>({x,i})).reverse().map(({x,i})=>h("div",{class:"tr"},h("span",null,String(i+1)),h("span",null,fmt(p,x.buy)),h("span",null,fmt(p,x.sell)),
+        h("span",null,h("span",{class:"tag "+(x.filled?"up":"")},x.filled?"bought":"waiting"))))));
+    if(r.price>r.hi||r.price<r.lo)now.append(h("div",{class:"warnbox"},"The price is outside the grid range."));
+    now.append(h("div",{class:"warnbox"},`No stop: if the price falls to ${fmt(p,r.lo)} with every level bought, about ${money(r.worst/pip(p)*pvLot(p))} is open against you.`));
+    const tot=bt.real+bt.unreal;
+    back.append(h("h2",null,"Backtest"),h("p",{class:"src"},`${r.from} → ${r.to}, ${r.n} daily bars, this grid fixed the whole time.`),eqSpark(bt.eq.map(e=>u(e*r.lots))),
+      kvBox([["Completed levels",String(bt.rounds)],["Still held",`${bt.openNow} of ${r.lv.length}`],["Closed P&L",sMoney(u(bt.real*r.lots)),cls(bt.real)],["Open P&L",sMoney(u(bt.unreal*r.lots)),cls(bt.unreal)],
+        ["Total",sMoney(u(tot*r.lots)),cls(tot)],["Worst drawdown",sMoney(u(bt.dd*r.lots)),"neg"],["Most held",`${bt.maxHeld} (${+(bt.maxHeld*r.lots).toFixed(2)} lots)`],["Range",`${fmt(p,r.lo)}–${fmt(p,r.hi)}`]]));
+  }else if(r.strat==="dca"){
+    now.append(h("h2",null,`DCA ladder · ${r.side>0?"buy":"sell"} ${label(p)} at ${fmt(p,r.price)}`),
+      tbl("1fr 1fr 1fr 1fr",["Order","Fill","Average","Take profit"],r.rows.map(x=>h("div",{class:"tr"},h("span",null,x.name),h("span",null,fmt(p,x.price)),h("span",null,fmt(p,x.avg)),h("span",null,fmt(p,x.tp)),
+        h("span",{class:"more"},`${+x.total.toFixed(2)} lots in total · ${money(u(Math.abs(x.tp-x.avg)*x.total))} at the take-profit`)))));
+    if(r.sl){const sl=r.price*(1-r.side*r.sl/100),last=r.rows[r.rows.length-1];now.append(h("div",{class:"warnbox"},`Stop-loss ${fmt(p,sl)}: with every order filled the loss is about ${money(u(Math.abs(last.avg-sl)*last.total))}.`))}
+    else now.append(h("div",{class:"warnbox"},"No stop-loss: the loss is open-ended if the price keeps going against the trade."));
+    const w=bt.trades.filter(t=>t.why==="target").length,n=bt.trades.length;
+    back.append(h("h2",null,"Backtest"),h("p",{class:"src"},`${r.from} → ${r.to}, ${r.n} daily bars. A new trade opens at the close after each exit.`),eqSpark(bt.eq.map(u)),
+      kvBox([["Trades closed",String(n)],["Hit target",n?`${w} (${Math.round(w/n*100)}%)`:"–"],["Stopped out",String(n-w)],["Avg safety fills",n?(bt.trades.reduce((a,t)=>a+t.fills,0)/n).toFixed(1):"–"],
+        ["Closed P&L",sMoney(u(bt.real)),cls(bt.real)],["Open P&L",sMoney(u(bt.unreal)),cls(bt.unreal)],["Worst drawdown",sMoney(u(bt.dd)),"neg"],["Largest size",`${+(r.lots+r.saf.reduce((a,x)=>a+x[1],0)).toFixed(2)} lots`]]));
+    if(n)back.append(tbl("1fr 1fr auto",["Closed","Exit","P&L"],bt.trades.slice(-5).reverse().map(t=>h("div",{class:"tr"},h("span",null,t.close),h("span",null,t.why+(t.fills?` · ${t.fills} safety`:"")),h("span",{class:cls(t.pnl)},sMoney(u(t.pnl)))))));
+  }else{
+    const zone=r.now>r.rhi?"above the sell line":r.now<r.rlo?"below the buy line":"between the lines";
+    now.append(h("h2",null,`RSI now · ${label(p)} ${fmt(p,r.price)}`),
+      h("div",{class:"big"},r.now.toFixed(1),h("small",null,`RSI ${r.per}, ${zone}`+(r.streak?` for ${r.streak} candle${r.streak>1?"s":""}`:""))),
+      eqSpark(r.rs.slice(-60).filter(x=>x!=null)));
+    let msg;if(r.sigNow)msg=`Signal on the last candle: ${r.sigNow.toUpperCase()}.`;
+    else if(r.now<=r.rhi&&r.now>=r.rlo)msg=`No signal. A buy needs RSI below ${r.rlo}, a sell above ${r.rhi}.`;
+    else if(r.streak<r.pers)msg=`No signal yet: ${r.pers-r.streak} more candle(s) in the zone.`;else msg="No new signal: this move already gave its signal.";
+    now.append(h("p",{class:"src"},msg+(r.lastSig?` Last signal: ${r.lastSig.s.toUpperCase()} on ${r.lastSig.d}.`:"")));
+    const w=bt.trades.filter(t=>t.diff>0).length,n=bt.trades.length;
+    back.append(h("h2",null,"Backtest"),h("p",{class:"src"},`${r.from} → ${r.to}, ${r.n} daily bars, fills at the signal candle's close, ${r.mode==="both"?"both ways":"long only"}.`),eqSpark(bt.eq.map(e=>u(e*r.lots))),
+      kvBox([["Trades closed",String(n)],["Winners",n?`${w} (${Math.round(w/n*100)}%)`:"–"],["Closed P&L",sMoney(u(bt.real*r.lots)),cls(bt.real)],["Open P&L",bt.open?sMoney(u(bt.unreal*r.lots)):"flat",cls(bt.unreal)],
+        ["Worst drawdown",sMoney(u(bt.dd*r.lots)),"neg"],["Position now",bt.open?`${bt.open.side>0?"long":"short"} from ${fmt(p,bt.open.px)}`:"none"]]));
+    if(n)back.append(tbl("auto 1fr auto",["Side","Closed","Pips"],bt.trades.slice(-5).reverse().map(t=>h("div",{class:"tr"},h("span",null,t.side),h("span",null,t.close),h("span",{class:cls(t.diff)},(t.diff>=0?"+":"")+(t.diff/pip(p)).toFixed(1))))));
+  }
+  out.append(now,back);
+}
+function botRangeFill(){const p=norm(bv("bSym")),B=barsFor(p);if(!B)return;const prior=B.bars.slice(-21,-1);
+  document.getElementById("bLow").value=Math.min(...prior.map(loB)).toFixed(dec(p));document.getElementById("bHigh").value=Math.max(...prior.map(hiB)).toFixed(dec(p))}
+function botInit(){
+  const dl=document.getElementById("botList");SNAP.fx.map(r=>r.s).forEach(s=>dl.append(h("option",{value:s})));
+  document.querySelectorAll("#bSeg button").forEach(b=>b.addEventListener("click",()=>{strat=b.dataset.s;document.querySelectorAll("#bSeg button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));renderBots()}));
+  const f=document.getElementById("botForm");f.addEventListener("input",e=>{if(e.target.id!=="bSym")renderBots()});f.addEventListener("submit",e=>e.preventDefault());
+  document.getElementById("bSym").addEventListener("change",()=>{botRangeFill();renderBots()});
+  const lb=document.getElementById("bLive");lb.addEventListener("click",async()=>{const p=norm(bv("bSym"));if(!p||kind(p)==="stock"){renderBots();return}lb.disabled=true;lb.textContent="Loading…";
+    try{await fetchLive(p,{refresh:!!(live[p]&&live[p].bars)})}catch(e){live[p]={...(live[p]||{}),err:errCopy(e,p)}}lb.disabled=false;lb.textContent="Live bars";botRangeFill();renderBots()});
+  botRangeFill();renderBots();
+}
+
 // ---------------------------------------------------------------- wiring
 function showView(v){
-  for(const id of ["signals","ask","plan"])document.getElementById("v-"+id).hidden=id!==v;
+  for(const id of ["signals","bots","ask","plan"])document.getElementById("v-"+id).hidden=id!==v;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===v)));
   document.getElementById("composer").hidden=v!=="ask";
   try{localStorage.setItem("jarvis.view",v)}catch(e){}
@@ -474,7 +695,7 @@ const dl=document.getElementById("symList");[...SNAP.fx.map(r=>r.s),...SNAP.stoc
 document.getElementById("asof").textContent="Scan: "+SNAP.asofLabel.replace(", 2026","");
 (function init(){
   const e=SNAP.fx.find(x=>x.s==="EURUSD");if(e){document.getElementById("pEntry").value=e.p.toFixed(5);document.getElementById("pStop").value=(e.p-0.003).toFixed(5)}
-  renderClock();setInterval(renderClock,30000);renderSignals();plan();
-  let v="signals";try{v=localStorage.getItem("jarvis.view")||"signals"}catch(e){}if(!["signals","ask","plan"].includes(v))v="signals";showView(v);
+  renderClock();setInterval(renderClock,30000);renderSignals();plan();botInit();
+  let v="signals";try{v=localStorage.getItem("jarvis.view")||"signals"}catch(e){}if(!["signals","bots","ask","plan"].includes(v))v="signals";showView(v);
 })();
 </script>
