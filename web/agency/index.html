@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>The Agency Roster</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Browse, search and install every specialist agent from the open-source agency-agents collection.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Schibsted+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a staff directory. Sticky masthead with search, a division rail, a card roster, a drawer that opens each agent's full brief, and a team tray that turns picks into an install script. */
+:root{
+  --paper:#F4F6FB; --surface:#FFFFFF; --sunken:#E9EDF6;
+  --ink:#121726; --muted:#5A6378; --line:#D8DEEA;
+  --accent:#2648E8; --accent-ink:#FFFFFF; --accent-soft:#E3E8FF;
+  --ok:#137A45;
+  --shadow:0 18px 48px -18px rgba(18,23,38,.35);
+  --f-display:"Bricolage Grotesque","Schibsted Grotesk",system-ui,sans-serif;
+  --f-body:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0D111B; --surface:#151B29; --sunken:#1C2334;
+  --ink:#E8ECF6; --muted:#98A2BA; --line:#2A3348;
+  --accent:#8EA4FF; --accent-ink:#0D111B; --accent-soft:#1F2A4D;
+  --ok:#5BD49A; --shadow:0 18px 48px -18px rgba(0,0,0,.7); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0D111B; --surface:#151B29; --sunken:#1C2334;
+  --ink:#E8ECF6; --muted:#98A2BA; --line:#2A3348;
+  --accent:#8EA4FF; --accent-ink:#0D111B; --accent-soft:#1F2A4D;
+  --ok:#5BD49A; --shadow:0 18px 48px -18px rgba(0,0,0,.7); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--paper)}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--accent)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-size:.78rem;letter-spacing:.01em}
+
+/* Masthead */
+.mast{padding-block:2.5rem 1.5rem}
+.mast-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1.5rem}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin:0 0 .6rem}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(2.4rem,6vw,4.4rem);line-height:.95;letter-spacing:-.03em;margin:0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+.lede{max-width:56ch;color:var(--muted);font-size:1.05rem;margin:.9rem 0 0}
+.tally{display:flex;gap:1.75rem;flex-wrap:wrap}
+.tally div{display:flex;flex-direction:column}
+.tally b{font-family:var(--f-display);font-size:2.2rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tally span{font-family:var(--f-mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:.35rem}
+
+/* Sticky toolbar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar-in{display:flex;gap:.75rem;align-items:center;padding-block:.8rem}
+.search{flex:1;min-width:0;position:relative}
+.search input{width:100%;padding:.72rem .9rem .72rem 2.5rem;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);font:inherit;font-size:1rem}
+.search input::placeholder{color:var(--muted)}
+.search svg{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--muted);fill:none}
+.search input:focus~kbd,.search input:not(:placeholder-shown)~kbd{display:none}
+.search kbd{position:absolute;right:.7rem;top:50%;transform:translateY(-50%);font-family:var(--f-mono);font-size:.7rem;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:.05rem .4rem}
+select{font:inherit;padding:.7rem .8rem;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink)}
+.chips{display:flex;gap:.4rem;overflow-x:auto;padding-bottom:.8rem;scrollbar-width:thin}
+.chip{flex:none;display:inline-flex;align-items:center;gap:.45rem;padding:.38rem .75rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:.85rem;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c,var(--muted))}
+.chip small{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip[aria-pressed="true"] small{color:inherit;opacity:.7}
+
+/* Roster */
+main{padding-block:1.5rem 7rem}
+.status{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.status p{margin:0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.card{position:relative;display:flex;flex-direction:column;gap:.6rem;padding:1rem 1rem .85rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-align:left;transition:border-color .15s,transform .15s;min-width:0}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.card-hd{display:flex;gap:.75rem;align-items:flex-start}
+.ava{flex:none;width:42px;height:42px;display:grid;place-items:center;border-radius:9px;font-size:1.35rem;background:color-mix(in srgb,var(--c) 16%,var(--surface))}
+.card h3{font-family:var(--f-display);font-weight:700;font-size:1.08rem;line-height:1.2;margin:0;letter-spacing:-.01em}
+.card h3 button{all:unset;cursor:pointer}
+.card h3 button::after{content:"";position:absolute;inset:0;border-radius:var(--r)}
+.div-label{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--muted);margin-top:.15rem}
+.div-label i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.card p{margin:0;color:var(--muted);font-size:.9rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card-ft{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding-top:.35rem}
+.card-ft .mono{color:var(--muted);font-variant-numeric:tabular-nums}
+.pick{position:relative;z-index:1;border:1px solid var(--line);background:transparent;border-radius:7px;padding:.28rem .6rem;font-size:.8rem}
+.pick:hover{border-color:var(--accent);color:var(--accent)}
+.pick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.empty{padding:3rem 1rem;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+.loading{color:var(--muted);padding:2rem 0}
+
+/* How-to */
+.howto{margin-top:4rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem;border-top:1px solid var(--line);padding-top:2rem}
+.howto h2{font-family:var(--f-display);font-size:1.6rem;margin:0;grid-column:1/-1;letter-spacing:-.02em}
+.step{min-width:0}
+.step b{font-family:var(--f-mono);font-size:.72rem;color:var(--accent);letter-spacing:.1em}
+.step h3{margin:.3rem 0 .4rem;font-size:1.05rem}
+.step p{margin:0 0 .6rem;color:var(--muted)}
+pre.cmd{margin:0;padding:.7rem .85rem;background:var(--sunken);border-radius:8px;overflow-x:auto;font-family:var(--f-mono);font-size:.78rem;line-height:1.6}
+footer{border-top:1px solid var(--line);padding-block:1.5rem 2rem;color:var(--muted);font-size:.85rem}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(8,11,20,.45);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,100%);background:var(--surface);z-index:50;box-shadow:var(--shadow);transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer.on{transform:none}
+.d-hd{padding:1.25rem 1.5rem 1rem;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:.8rem}
+.d-row{display:flex;gap:1rem;align-items:flex-start}
+.d-row .ava{width:54px;height:54px;font-size:1.7rem;border-radius:12px}
+.d-row h2{font-family:var(--f-display);font-size:1.7rem;line-height:1.1;margin:0;letter-spacing:-.02em;text-wrap:balance}
+.d-vibe{margin:.3rem 0 0;color:var(--muted)}
+.close{margin-left:auto;flex:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:transparent;font-size:1.2rem;line-height:1}
+.actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem .85rem;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:.86rem;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.d-path{color:var(--muted);overflow-wrap:anywhere}
+.d-body{overflow-y:auto;padding:1.25rem 1.5rem 3rem;flex:1;min-height:0}
+.md{max-width:68ch;font-size:.95rem}
+.md h1,.md h2,.md h3,.md h4{font-family:var(--f-display);letter-spacing:-.01em;line-height:1.2;margin:1.8em 0 .5em}
+.md h1{font-size:1.5rem;margin-top:0}.md h2{font-size:1.25rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}.md h3{font-size:1.05rem}
+.md p,.md ul,.md ol{margin:0 0 .9em}
+.md li{margin:.2em 0}
+.md code{font-family:var(--f-mono);font-size:.82em;background:var(--sunken);padding:.1em .35em;border-radius:4px}
+.md pre{background:var(--sunken);padding:.85rem 1rem;border-radius:8px;overflow-x:auto;font-size:.8rem;line-height:1.55}
+.md pre code{background:none;padding:0}
+.md table{border-collapse:collapse;display:block;overflow-x:auto;font-size:.85rem;margin-bottom:1em}
+.md th,.md td{border:1px solid var(--line);padding:.4rem .6rem;text-align:left;vertical-align:top}
+.md blockquote{margin:0 0 1em;padding:.2rem 1rem;border-left:3px solid var(--line);color:var(--muted)}
+.md a{overflow-wrap:anywhere}
+.md img{max-width:100%}
+
+/* Team tray */
+.tray{position:fixed;left:0;right:0;bottom:0;z-index:35;background:var(--ink);color:var(--paper);transform:translateY(110%);transition:transform .25s;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tray.on{transform:none}
+.tray-in{display:flex;align-items:center;gap:1rem;padding-block:.75rem;flex-wrap:wrap}
+.tray-names{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.88rem;opacity:.85}
+.tray strong{font-family:var(--f-display);font-size:1.05rem}
+.tray .btn{background:transparent;color:var(--paper);border-color:color-mix(in srgb,var(--paper) 30%,transparent)}
+.tray .btn.primary{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.toast{position:fixed;left:50%;bottom:calc(5rem + env(safe-area-inset-bottom,0px));transform:translate(-50%,1rem);background:var(--ok);color:var(--paper);padding:.55rem 1rem;border-radius:8px;font-size:.88rem;z-index:60;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.sheet{width:100%;min-height:9rem;margin-top:.6rem;font-family:var(--f-mono);font-size:.75rem;background:var(--sunken);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.6rem}
+
+@media (max-width:640px){
+  .mast{padding-block:1.5rem 1rem}
+  .bar-in select{max-width:8.5rem}
+  .search kbd{display:none}
+  .d-hd,.d-body{padding-left:1rem;padding-right:1rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="mast wrap">
+  <div class="mast-top">
+    <div>
+      <p class="eyebrow">Open-source agent personalities · MIT</p>
+      <h1>The Agency <em>Roster</em></h1>
+      <p class="lede">Every specialist in the <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">agency-agents</a> collection, in one searchable directory. Open any agent to read its full brief, copy the prompt, or pick a team and get one install script for Claude Code.</p>
+    </div>
+    <div class="tally" aria-live="polite">
+      <div><b id="t-agents">–</b><span>Agents</span></div>
+      <div><b id="t-divs">–</b><span>Divisions</span></div>
+      <div><b id="t-words">–</b><span>Words of brief</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="wrap">
+    <div class="bar-in">
+      <label class="search">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span hidden>Search agents</span>
+        <input id="q" type="search" placeholder="Search by role, skill or vibe: “SEO”, “Unity”, “threat model”…" autocomplete="off">
+        <kbd>/</kbd>
+      </label>
+      <label><span hidden>Sort</span>
+        <select id="sort">
+          <option value="div">By division</option>
+          <option value="az">A to Z</option>
+          <option value="long">Longest brief</option>
+        </select>
+      </label>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Filter by division"></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="status"><p id="count" aria-live="polite">Loading the roster…</p><p class="mono" id="src"></p></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>No agent matches that search. Try a broader word or pick “All divisions”.</div>
+
+  <section class="howto" aria-labelledby="howto-h">
+    <h2 id="howto-h">Put an agent to work</h2>
+    <div class="step"><b>STEP 1</b><h3>Pick your specialists</h3><p>Search the roster and press <em>Add to team</em> on each agent you want. Your picks stay in this browser.</p></div>
+    <div class="step"><b>STEP 2</b><h3>Install them</h3><p>Copy the install script from the team bar and run it. It downloads each agent file into Claude Code's agent folder.</p><pre class="cmd">mkdir -p ~/.claude/agents
+curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
+  https://raw.githubusercontent.com/msitarzewski/agency-agents/main/&lt;path&gt;</pre></div>
+    <div class="step"><b>STEP 3</b><h3>Activate in a session</h3><p>Ask for the agent by name. Other tools (Cursor, Codex, Gemini CLI) are covered by the repo's own installer.</p><pre class="cmd">"Activate Backend Architect mode and
+ design the API for my booking app."</pre></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Agent content © AgentLand Contributors, MIT License. Source: <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">msitarzewski/agency-agents</a>.</span>
+    <span class="mono" id="foot-src"></span>
+  </div>
+</footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-name" aria-hidden="true">
+  <div class="d-hd">
+    <div class="d-row">
+      <div class="ava" id="d-ava"></div>
+      <div style="min-width:0">
+        <h2 id="d-name"></h2>
+        <span class="div-label" id="d-div"></span>
+        <p class="d-vibe" id="d-vibe"></p>
+      </div>
+      <button class="close" id="d-close" aria-label="Close">×</button>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="d-pick">Add to team</button>
+      <button class="btn" id="d-copy">Copy prompt</button>
+      <button class="btn" id="d-cmd">Copy install command</button>
+      <a class="btn" id="d-gh" target="_blank" rel="noopener">View on GitHub ↗</a>
+    </div>
+    <span class="mono d-path" id="d-path"></span>
+  </div>
+  <div class="d-body"><article class="md" id="d-md"></article></div>
+</aside>
+
+<aside class="drawer" id="team" role="dialog" aria-modal="true" aria-labelledby="team-h" aria-hidden="true">
+  <div class="d-hd">
+    <div class="d-row"><div style="min-width:0"><h2 id="team-h">Your team</h2><p class="d-vibe" id="team-sub"></p></div><button class="close" id="team-close" aria-label="Close">×</button></div>
+    <div class="actions"><button class="btn primary" id="team-copy">Copy install script</button><button class="btn" id="team-clear">Remove everyone</button></div>
+  </div>
+  <div class="d-body">
+    <div class="md">
+      <p>Run this in a terminal to install your picks for Claude Code. Each file lands in <code>~/.claude/agents/</code>.</p>
+      <label for="team-script" hidden>Install script</label>
+      <textarea class="sheet" id="team-script" readonly rows="10"></textarea>
+      <h3>Members</h3>
+      <ul id="team-list"></ul>
+    </div>
+  </div>
+</aside>
+
+<div class="tray" id="tray">
+  <div class="wrap tray-in">
+    <strong id="tray-n">0 agents</strong>
+    <span class="tray-names" id="tray-names"></span>
+    <button class="btn" id="tray-clear">Clear</button>
+    <button class="btn primary" id="tray-open">Review &amp; install</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const RAW = "https://raw.githubusercontent.com/msitarzewski/agency-agents/main/";
+  const GH = "https://github.com/msitarzewski/agency-agents/blob/main/";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmt = n => n.toLocaleString("en-US");
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+
+  let data, bySlug = new Map(), divMap = new Map();
+  let state = { q: "", div: store.get("agency.div", "all"), sort: store.get("agency.sort", "div") };
+  let team = new Set(store.get("agency.team", []));
+  let current = null;
+
+  fetch("agents.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(init)
+    .catch(() => { $("count").textContent = "The roster file (agents.json) did not load. Serve this folder over HTTP, e.g. python3 -m http.server, and reload."; });
+
+  function init(d) {
+    data = d;
+    d.divisions.forEach(x => divMap.set(x.id, x));
+    d.agents.forEach(a => { a._hay = (a.name + " " + a.description + " " + a.vibe + " " + a.division + " " + a.group).toLowerCase(); bySlug.set(a.slug, a); });
+    team = new Set([...team].filter(s => bySlug.has(s)));
+    if (state.div !== "all" && !divMap.has(state.div)) state.div = "all";
+    $("t-agents").textContent = fmt(d.agents.length);
+    $("t-divs").textContent = d.divisions.length;
+    const words = d.agents.reduce((s, a) => s + a.words, 0);
+    $("t-words").textContent = words >= 1e6 ? (words / 1e6).toFixed(1) + "M" : Math.round(words / 1000) + "k";
+    const src = d.commit ? `synced from ${d.commit} · ${d.commitDate}` : "";
+    $("src").textContent = src; $("foot-src").textContent = src;
+    $("sort").value = state.sort;
+    renderChips(); render(); renderTeam(); route();
+  }
+
+  function renderChips() {
+    const all = `<button class="chip" data-div="all" aria-pressed="${state.div === "all"}">All divisions <small>${data.agents.length}</small></button>`;
+    $("chips").innerHTML = all + data.divisions.map(x =>
+      `<button class="chip" data-div="${x.id}" style="--c:${x.color}" aria-pressed="${state.div === x.id}"><i></i>${esc(x.label)} <small>${x.count}</small></button>`).join("");
+  }
+
+  function filtered() {
+    const terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    const res = terms.map(t => new RegExp("(^|[^a-z0-9])" + t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    let list = data.agents.filter(a => (state.div === "all" || a.division === state.div) && res.every(r => r.test(a._hay)));
+    if (state.sort === "az") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    else if (state.sort === "long") list = [...list].sort((a, b) => b.words - a.words);
+    if (terms.length) { // name matches first
+      const n = a => terms.every(t => a.name.toLowerCase().includes(t)) ? 0 : 1;
+      list = [...list].sort((a, b) => n(a) - n(b));
+    }
+    return list;
+  }
+
+  function card(a) {
+    const d = divMap.get(a.division);
+    const blurb = a.vibe || a.description;
+    const on = team.has(a.slug);
+    return `<article class="card" style="--c:${d.color}">
+      <div class="card-hd"><div class="ava" aria-hidden="true">${esc(a.emoji || "•")}</div>
+        <div style="min-width:0"><h3><button data-open="${a.slug}">${esc(a.name)}</button></h3>
+        <span class="div-label"><i></i>${esc(d.label)}${a.group ? " · " + esc(a.group) : ""}</span></div></div>
+      <p>${esc(blurb)}</p>
+      <div class="card-ft"><span class="mono">${fmt(a.words)} words</span>
+        <button class="pick" data-pick="${a.slug}" aria-pressed="${on}" aria-label="${on ? "Remove" : "Add"} ${esc(a.name)} ${on ? "from" : "to"} team">${on ? "✓ On team" : "+ Add to team"}</button></div>
+    </article>`;
+  }
+
+  function render() {
+    const list = filtered();
+    $("grid").innerHTML = list.map(card).join("");
+    $("empty").hidden = list.length > 0;
+    const scope = state.div === "all" ? "across all divisions" : "in " + divMap.get(state.div).label;
+    $("count").textContent = `${fmt(list.length)} ${list.length === 1 ? "agent" : "agents"} ${scope}${state.q ? ` matching “${state.q}”` : ""}`;
+  }
+
+  // Team
+  function toggleTeam(slug) {
+    team.has(slug) ? team.delete(slug) : team.add(slug);
+    store.set("agency.team", [...team]);
+    document.querySelectorAll(`[data-pick="${slug}"]`).forEach(b => {
+      const on = team.has(slug), a = bySlug.get(slug);
+      b.setAttribute("aria-pressed", on); b.textContent = on ? "✓ On team" : "+ Add to team";
+      b.setAttribute("aria-label", `${on ? "Remove" : "Add"} ${a.name} ${on ? "from" : "to"} team`);
+    });
+    if (current && current.slug === slug) syncDrawerPick();
+    renderTeam();
+  }
+  function script() {
+    const lines = ["#!/usr/bin/env bash", "# Install your Agency team for Claude Code", "set -e", "mkdir -p ~/.claude/agents"];
+    [...team].map(s => bySlug.get(s)).forEach(a => lines.push(`curl -fsSL -o ~/.claude/agents/${a.path.split("/").pop()} ${RAW}${a.path}`));
+    lines.push(`echo "Installed ${team.size} agent${team.size === 1 ? "" : "s"} to ~/.claude/agents"`);
+    return lines.join("\n");
+  }
+  function renderTeam() {
+    const members = [...team].map(s => bySlug.get(s));
+    $("tray").classList.toggle("on", members.length > 0);
+    $("tray-n").textContent = `${members.length} ${members.length === 1 ? "agent" : "agents"}`;
+    $("tray-names").textContent = members.map(a => a.name).join(", ");
+    $("team-sub").textContent = members.length ? `${members.length} specialists picked` : "No one picked yet. Add agents from the roster.";
+    $("team-script").value = members.length ? script() : "";
+    $("team-list").innerHTML = members.map(a => `<li><a href="#${a.slug}">${esc(a.name)}</a> · ${esc(divMap.get(a.division).label)} <button class="pick" data-pick="${a.slug}" aria-pressed="true" aria-label="Remove ${esc(a.name)} from team">✓ On team</button></li>`).join("");
+  }
+
+  // Drawer
+  function renderMd(src) {
+    if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(src, { gfm: true }));
+    return `<pre>${esc(src)}</pre>`;
+  }
+  function syncDrawerPick() { $("d-pick").textContent = team.has(current.slug) ? "✓ On team (remove)" : "Add to team"; }
+  function openAgent(a) {
+    current = a;
+    const d = divMap.get(a.division);
+    $("drawer").style.setProperty("--c", d.color);
+    $("d-ava").textContent = a.emoji || "•";
+    $("d-name").textContent = a.name;
+    $("d-div").innerHTML = `<i></i>${esc(d.label)}${a.group ? " · " + esc(a.group) : ""} · ${fmt(a.words)} words`;
+    $("d-vibe").textContent = a.vibe || a.description;
+    $("d-path").textContent = a.path;
+    $("d-gh").href = GH + a.path;
+    $("d-md").innerHTML = (a.vibe && a.description ? `<blockquote><p>${esc(a.description)}</p></blockquote>` : "") + renderMd(a.body);
+    $("d-md").querySelectorAll("a[href^='http']").forEach(l => { l.target = "_blank"; l.rel = "noopener"; });
+    syncDrawerPick();
+    show("drawer"); $("drawer").querySelector(".d-body").scrollTop = 0;
+    document.title = a.name + " · The Agency Roster";
+  }
+  function show(id) {
+    ["drawer", "team"].forEach(x => { const on = x === id; $(x).classList.toggle("on", on); $(x).setAttribute("aria-hidden", !on); });
+    $("scrim").classList.toggle("on", !!id);
+    document.body.style.overflow = id ? "hidden" : "";
+    if (id) setTimeout(() => $(id).querySelector(".close").focus(), 50);
+  }
+  function closeAll() {
+    show(null); current = null; document.title = "The Agency Roster";
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  }
+  function route() {
+    if (!data) return;
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (h === "team") { show("team"); return; }
+    const a = bySlug.get(h);
+    a ? openAgent(a) : (current || $("team").classList.contains("on")) && show(null);
+  }
+  addEventListener("hashchange", route);
+
+  // Copy
+  let tt;
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("on"), 1800); }
+  function copy(text, done, fallbackEl) {
+    const ok = () => toast(done);
+    const fail = () => {
+      if (fallbackEl) { fallbackEl.focus(); fallbackEl.select(); toast("Selected. Press Ctrl+C or ⌘C to copy."); }
+      else { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+        let r = false; try { r = document.execCommand("copy"); } catch {} ta.remove(); r ? ok() : toast("Copy was blocked here. Use View on GitHub instead."); }
+    };
+    try { navigator.clipboard.writeText(text).then(ok, fail); } catch { fail(); }
+  }
+
+  // Events
+  document.addEventListener("click", e => {
+    const p = e.target.closest("[data-pick]"); if (p) { e.preventDefault(); toggleTeam(p.dataset.pick); return; }
+    const o = e.target.closest("[data-open]"); if (o) { location.hash = o.dataset.open; return; }
+    const c = e.target.closest(".chip"); if (c) { state.div = c.dataset.div; store.set("agency.div", state.div); renderChips(); render(); }
+  });
+  $("q").addEventListener("input", e => { state.q = e.target.value.trim(); render(); });
+  $("sort").addEventListener("change", e => { state.sort = e.target.value; store.set("agency.sort", state.sort); render(); });
+  $("scrim").addEventListener("click", closeAll);
+  $("d-close").addEventListener("click", closeAll);
+  $("team-close").addEventListener("click", closeAll);
+  $("d-pick").addEventListener("click", () => current && toggleTeam(current.slug));
+  $("d-copy").addEventListener("click", () => current && copy(current.body, "Prompt copied"));
+  $("d-cmd").addEventListener("click", () => current && copy(`mkdir -p ~/.claude/agents && curl -fsSL -o ~/.claude/agents/${current.path.split("/").pop()} ${RAW}${current.path}`, "Install command copied"));
+  $("tray-open").addEventListener("click", () => { location.hash = "team"; });
+  $("tray-clear").addEventListener("click", clearTeam);
+  $("team-clear").addEventListener("click", clearTeam);
+  $("team-copy").addEventListener("click", () => team.size ? copy(script(), "Install script copied", $("team-script")) : toast("Add agents to your team first"));
+  function clearTeam() { const s = [...team]; team.clear(); store.set("agency.team", []); s.forEach(x => document.querySelectorAll(`[data-pick="${x}"]`).forEach(b => { b.setAttribute("aria-pressed", false); b.textContent = "+ Add to team"; })); if (current) syncDrawerPick(); renderTeam(); toast("Team cleared"); }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && $("scrim").classList.contains("on")) closeAll();
+    else if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") { e.preventDefault(); $("q").focus(); }
+  });
+})();
+</script>
+
+</body>
+</html>
