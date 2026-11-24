@@ -37,6 +37,38 @@ Files: `trader/fx_plan.json` (plan), `trader/fx_orders.json` (proposed order),
 `trader/fx_scan.json`, `trader/fx_rates.json`. Every command takes
 `--offline DIR` (files named `yahoo-EURUSD.json` or `stooq-EURUSD.csv`).
 
+## Bot strategies: GRID, DCA, RSI (ported from OpenTrader)
+
+`strategies.py` ports the three strategies of [OpenTrader](https://github.com/Open-Trader/opentrader)
+(Apache-2.0) to Python for pairs, metals and crypto CFDs. It shows levels and signals and replays them
+on past bars. It never places an order.
+
+```bash
+S="${CLAUDE_SKILL_DIR}/strategies.py"
+python3 "$S" grid EURUSD --low 1.0700 --high 1.0900 --levels 10 --lots 0.01   # or --auto (20-day low/high)
+python3 "$S" dca XAUUSD --lots 0.01 --tp-pct 1 --sl-pct 5 --safety 1:0.01,2:0.02
+python3 "$S" rsi GBPUSD --periods 14 --low 30 --high 70 --persistence 2 [--interval 1h]
+python3 "$S" backtest grid EURUSD --low 1.10 --high 1.20 --levels 11 --lots 0.1 --write
+python3 "$S" backtest dca GBPJPY --side sell --tp-pct 0.4 --sl-pct 2 --safety 0.5:0.01,1:0.02 --rsi-above 60
+python3 "$S" backtest rsi BTCUSD --interval 1h --mode both --range 3mo
+```
+
+- **GRID:** equal steps from low to high. Each line except the top one buys and takes profit at the
+  next line up; lines above the price (and the line nearest it) are bought at the start, the rest wait
+  as buy limits. Completed levels re-arm. Long only and no stop: below the range every level is held.
+- **DCA:** entry, then safety orders at -X% from the entry; the take-profit is +Y% from the *average*
+  price and moves after each fill; optional stop-loss at -Z% from the entry, which must be beyond the
+  deepest safety order. A closed trade is replaced by a new one. `--side sell` mirrors it.
+  `--rsi-below` / `--rsi-above` (backtest) only open a trade when RSI agrees, like OpenTrader's entry conditions.
+- **RSI:** RSI above `--high` for `--persistence` candles = one sell; below `--low` = one buy.
+  `--mode long` (default, like OpenTrader on spot) buys on low and closes on high; `--mode both`
+  also goes short on high.
+
+Backtests fill at the exact level (or at the open when a bar gaps through it), assume the stop when one
+bar touches the stop and the target, and ignore spread, swap, commission and slippage. A grid backtest
+with `--auto` uses the whole period's low/high, which is look-ahead: give `--low/--high` for an honest
+test. `--write` saves `trader/fx_backtest.json`. Tests: `python3 "${CLAUDE_SKILL_DIR}/test_strategies.py"`.
+
 ## Gold and silver
 
 `XAUUSD` (or `gold`) and `XAGUSD` (`silver`). A lot is 100 oz of gold (pip

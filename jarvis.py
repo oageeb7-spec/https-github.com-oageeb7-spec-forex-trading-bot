@@ -127,6 +127,18 @@ TOOLS: dict[str, tuple[str, set[str] | None, str]] = {
         "(default: majors, crosses, gold and BTCUSD). Gold and silver work as XAUUSD and XAGUSD; "
         "crypto CFDs as BTCUSD and ETHUSD (sizing writes an order only if allow_crypto is on).",
     ),
+    "strategies": (
+        "trader-forex/strategies.py",
+        {"grid", "dca", "rsi", "backtest"},
+        "Bot strategies ported from OpenTrader, for forex pairs, gold, silver, BTCUSD, ETHUSD. Paper only. "
+        "`grid EURUSD --low 1.07 --high 1.09 --levels 10 [--lots 0.01]` or `grid EURUSD --auto` = grid "
+        "levels (buy at each line, take profit at the next line up); `dca XAUUSD [--side buy|sell] "
+        "[--entry X] --lots 0.01 --tp-pct 0.5 [--sl-pct 3] [--safety 0.3:0.01,0.6:0.02]` = DCA ladder "
+        "with average price and TP after each safety order; `rsi GBPUSD [--periods 14 --low 30 --high 70 "
+        "--persistence 1] [--interval 1h]` = RSI now and the strategy's buy/sell signal; `backtest "
+        "grid|dca|rsi PAIR [same options] [--range 1y|2y] [--interval 1d|1h] [--mode long|both] "
+        "[--rsi-below 30] --write` = paper replay with P&L, win rate and drawdown (no spread or swap).",
+    ),
     "mt5bridge": (
         "trader-forex/mt5bridge.py",
         {"export", "where"},
@@ -158,7 +170,8 @@ How to work:
 - The pipeline for a day trade is: scanner -> news -> entry -> exit -> timemachine
   -> budget -> risk -> broker. Files pass between steps under trader/.
 - Forex is separate: forex clock -> forex scan -> forex quote -> forex plan ->
-  forex size -> fxbroker check. Stock tools (scanner, entry, budget, risk, broker) do not handle
+  forex size -> fxbroker check. Bot strategies (grid, DCA, RSI, ported from OpenTrader) are
+  the `strategies` tool: show the levels or the signal, and backtest before trusting one. Stock tools (scanner, entry, budget, risk, broker) do not handle
   currency pairs. Forex can be bought or sold short; stocks here are long only.
 - Keep scans small (--symbols or --limit) unless the user asks for a full scan.
 - If a script errors, read the message, fix the arguments and try again once;
@@ -479,6 +492,9 @@ def fx_numbers(text: str) -> list[float]:
 
 def route_forex(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | str:
     t = text.lower()
+    if has(t, "grid", "dca", "dollar.cost", "safety order", "rsi (bot|strateg|signal)", "backtest",
+           "back test") and not has(t, "scan"):
+        return route_strategy(text, pairs)
     if has(t, "oanda", "startrader", "star trader", "mt5", "metatrader", "meta trader",
            "broker", "my account", "balance", "margin", "positions", "send", "place", "execute"):
         if has(t, "position"):
@@ -535,6 +551,53 @@ def route_forex(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | st
     return [("forex", ["quote", *pairs])]
 
 
+def route_strategy(text: str, pairs: list[str]) -> list[tuple[str, list[str]]] | str:
+    """grid / dca / rsi strategies from OpenTrader: show now, or backtest."""
+    t = text.lower()
+    kind = "grid" if has(t, "grid") else "dca" if has(t, "dca", "dollar.cost", "safety order") else "rsi"
+    if not pairs:
+        return f"Which pair? e.g. \"{kind} EURUSD\" or \"backtest {kind} on gold\"."
+    pair = pairs[0]
+    test = has(t, "backtest", "back test", "test", "replay", "history", "how .* (do|perform)")
+    args = ["backtest", kind, pair] if test else [kind, pair]
+    lots = re.search(r"(\d*\.?\d+)\s*lots?\b", t)
+    if lots:
+        args += ["--lots", lots.group(1)]
+    if kind == "grid":
+        lv = re.search(r"(\d+)\s*(?:levels?|lines?|grids?)\b", t)
+        if lv:
+            args += ["--levels", lv.group(1)]
+        rng = re.search(r"(?:from|between)?\s*(\d+\.\d+)\s*(?:to|-|and)\s*(\d+\.\d+)", t)
+        if rng:
+            lo, hi = sorted([rng.group(1), rng.group(2)], key=float)
+            args += ["--low", lo, "--high", hi]
+        else:
+            args += ["--auto"]
+    elif kind == "dca":
+        if has(t, "sell", "short"):
+            args += ["--side", "sell"]
+        tp = re.search(r"(?:tp|take.profit|target)\s*(?:of|at)?\s*(\d+\.?\d*)\s*%", t)
+        sl = re.search(r"(?:sl|stop(?:.loss)?)\s*(?:of|at)?\s*(\d+\.?\d*)\s*%", t)
+        if tp:
+            args += ["--tp-pct", tp.group(1)]
+        if sl:
+            args += ["--sl-pct", sl.group(1)]
+        if has(t, "safety"):
+            q = float(lots.group(1)) if lots else 0.01
+            args += ["--safety", f"0.5:{q:g},1:{2 * q:g}"]
+        if test and has(t, "rsi"):
+            r = re.search(r"rsi\s*(?:below|under|<)\s*(\d+)", t)
+            args += ["--rsi-below", r.group(1) if r else "30"]
+    else:
+        if has(t, "hour", "1h", "intraday"):
+            args += ["--interval", "1h"]
+        if test and has(t, "short", "both"):
+            args += ["--mode", "both"]
+    if has(t, "2 ?y", "two years"):
+        args += ["--range", "2y"] if test else []
+    return [("strategies", args)]
+
+
 def route(text: str) -> list[tuple[str, list[str]]] | str:
     """Map a plain-English request to tool runs, or return a reply string."""
     t = text.lower()
@@ -543,7 +606,7 @@ def route(text: str) -> list[tuple[str, list[str]]] | str:
            "(mt5|metatrader) (signals|indicator|bridge)", "jarvissignals"):
         return [("mt5bridge", ["export", "--scan"])]
     if pairs or has(t, "forex", "\\bfx\\b", "currenc", "oanda", "startrader", "star trader",
-                    "\\bmt5", "metatrader", "meta trader", "send .*broker", "send .*order", "forex order", "\\bpips?\\b", "how many lots", "lot size"):
+                    "\\bmt5", "metatrader", "meta trader", "\\bgrid\\b", "\\bdca\\b", "send .*broker", "send .*order", "forex order", "\\bpips?\\b", "how many lots", "lot size"):
         if not has(t, "set ", "change ", "update ", "my rules", "settings"):
             return route_forex(text, pairs)
     tickers = find_tickers(text)
@@ -664,6 +727,11 @@ Forex:
   set forex account to 25000     set leverage to 50
   price of gold                  buy gold at 2650 stop 2635 target 2R
   my STARTRADER account          my forex positions
+
+Bot strategies (grid, DCA, RSI from OpenTrader; paper only):
+  grid EURUSD from 1.07 to 1.09 with 8 levels    backtest the grid on gold
+  dca gold tp 1% sl 5% with safety orders        rsi signal on cable hourly
+  backtest rsi on EURUSD both ways over 2 years  backtest dca sell GBPJPY tp 0.4% sl 2%
 
 Commands:
   /run <tool> <args>   run a skill script directly, e.g. /run alerts clock

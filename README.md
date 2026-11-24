@@ -53,6 +53,18 @@ JARVIS trades currency pairs too, through the `trader-forex` skill
   Works with any MT5 broker. Use OANDA instead with `JARVIS_FX_BROKER=oanda`
   (`OANDA_API_TOKEN`, `OANDA_ACCOUNT_ID`).
 
+### Bot strategies: GRID, DCA and RSI
+
+The grid, DCA and RSI strategies from [OpenTrader](https://github.com/Open-Trader/opentrader)
+(Apache-2.0) are ported to Python in `.claude/skills/trader-forex/strategies.py`, for forex pairs,
+gold, silver, BTCUSD and ETHUSD. They show the grid levels, the DCA ladder (average price and
+take-profit after each safety order) or the RSI signal now, and backtest on daily or hourly bars with
+P&L, win rate and drawdown. Paper only: nothing is placed.
+
+Try: "grid EURUSD from 1.07 to 1.09 with 8 levels", "dca gold tp 1% sl 5% with safety orders",
+"rsi signal on cable hourly", "backtest rsi on EURUSD both ways over 2 years",
+"backtest dca sell GBPJPY tp 0.4% sl 2%". Backtests ignore spread, swap and slippage.
+
 ### Signals on your MT5 charts
 
 `python .claude/skills/trader-forex/mt5bridge.py export --scan --every 15` (or ask JARVIS
