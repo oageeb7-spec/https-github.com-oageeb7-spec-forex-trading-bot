@@ -4,10 +4,27 @@ A static website for browsing every agent in
 [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents)
 (MIT, © AgentLand Contributors).
 
+- **Give any agent a job.** Each agent runs on Claude with its full brief as its
+  instructions and hands back the real deliverable (code, copy, plans, reviews),
+  in a chat you can keep refining. Pick Fast, Standard or Deep.
+- **Run a team.** Pick several agents and give them one job; each works in turn
+  and builds on what the teammates before it delivered. Copy the full report.
 - Search by role, skill or vibe, and filter by the repo's 18 divisions
 - Open any agent to read its full brief, copy the prompt, or copy a one-line install command
 - Pick a team and get one install script for Claude Code (`~/.claude/agents/`)
-- Links are shareable: `index.html#backend-architect` opens that agent
+- Links are shareable: `index.html#engineering-backend-architect` opens that agent
+
+## How agents run
+
+- **Inside claude.ai** (the published Artifact): runs on the viewer's own Claude
+  account. The first run asks the viewer to allow it.
+- **Anywhere else** (GitHub Pages, localhost): the page asks for an Anthropic API
+  key. The key is kept in that browser's localStorage and sent only to
+  `api.anthropic.com` (Fast = Haiku, Standard = Sonnet, Deep = Opus). Usage is
+  billed to that key. Only use your own key on a copy you control.
+
+Agents can't browse the web or run code; they work from what you give them.
+Chats are saved in your browser per agent.
 
 ## Files
 

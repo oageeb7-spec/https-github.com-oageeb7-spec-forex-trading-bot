@@ -151,7 +151,49 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .sheet{width:100%;min-height:9rem;margin-top:.6rem;font-family:var(--f-mono);font-size:.75rem;background:var(--sunken);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.6rem}
 
+/* Work pane */
+.tabs{display:flex;gap:.25rem;margin-bottom:-1rem}
+.tabs button{border:0;background:none;padding:.55rem .8rem;border-bottom:2px solid transparent;color:var(--muted);font-weight:500}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pane{flex:1;min-height:0;display:flex;flex-direction:column}
+.pane[hidden]{display:none!important}
+.log{flex:1;min-height:0;overflow-y:auto;padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1rem}
+.msg{min-width:0;max-width:100%}
+.msg.user{align-self:flex-end;max-width:85%;background:var(--accent-soft);padding:.65rem .9rem;border-radius:12px 12px 2px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.ai{border:1px solid var(--line);border-radius:12px;padding:.9rem 1rem .6rem;background:var(--paper)}
+.msg.ai .md{max-width:none}
+.msg.ai .md > :first-child{margin-top:0}
+.msg-ft{display:flex;gap:.5rem;align-items:center;justify-content:flex-end;border-top:1px solid var(--line);margin-top:.6rem;padding-top:.5rem}
+.msg-ft .mono{color:var(--muted);margin-right:auto}
+.msg-ft button{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:.2rem .55rem;font-size:.78rem}
+.thinking{color:var(--muted);display:flex;align-items:center;gap:.5rem}
+.thinking::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite alternate}
+@keyframes pulse{from{opacity:.25}to{opacity:1}}
+.note{font-size:.85rem;color:var(--muted);border-left:3px solid var(--accent);padding:.3rem .7rem}
+.hello{color:var(--muted);margin:auto 0 0}
+.hello strong{color:var(--ink)}
+.composer,.connect{border-top:1px solid var(--line);padding:.8rem 1.5rem;display:flex;flex-direction:column;gap:.55rem;background:var(--surface)}
+.connect h3{margin:0;font-family:var(--f-display)}
+.connect p{margin:0;color:var(--muted);font-size:.88rem}
+.fine{font-size:.78rem!important}
+.key-row{display:flex;gap:.5rem}
+.key-row input{flex:1;min-width:0}
+textarea#ask,textarea#job,.key-row input{font:inherit;width:100%;padding:.6rem .75rem;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);resize:vertical}
+.comp-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.comp-row .engine{margin-right:auto;color:var(--muted)}
+.tier{display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--muted)}
+.tier select{padding:.4rem .5rem;font-size:.85rem}
+.starters{display:flex;gap:.4rem;flex-wrap:wrap}
+.starters button{border:1px dashed var(--line);background:none;border-radius:999px;padding:.3rem .7rem;font-size:.8rem;color:var(--muted);text-align:left}
+.starters button:hover{border-color:var(--accent);color:var(--accent)}
+.job{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
+.job-step{border:1px solid var(--line);border-radius:12px;padding:.8rem 1rem;margin-bottom:.8rem;background:var(--paper)}
+.job-step h4{margin:0 0 .5rem;font-family:var(--f-display);display:flex;gap:.5rem;align-items:center}
+.job-step h4 small{font-family:var(--f-mono);font-weight:400;color:var(--muted);font-size:.72rem;margin-left:auto}
+.card-go{position:relative;z-index:1;border:0;background:none;color:var(--accent);font-size:.8rem;padding:.28rem .2rem;font-weight:600}
+
 @media (max-width:640px){
+  .log,.composer,.connect{padding-left:1rem;padding-right:1rem}
   .mast{padding-block:1.5rem 1rem}
   .bar-in select{max-width:8.5rem}
   .search kbd{display:none}
@@ -165,7 +207,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
     <div>
       <p class="eyebrow">Open-source agent personalities · MIT</p>
       <h1>The Agency <em>Roster</em></h1>
-      <p class="lede">Every specialist in the <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">agency-agents</a> collection, in one searchable directory. Open any agent to read its full brief, copy the prompt, or pick a team and get one install script for Claude Code.</p>
+      <p class="lede">Every specialist in the <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">agency-agents</a> collection, ready to work. Give any agent a job and it does it right here, running on Claude with its full brief as instructions. Or pick a team, hand them one job together, and install them in Claude Code.</p>
     </div>
     <div class="tally" aria-live="polite">
       <div><b id="t-agents">–</b><span>Agents</span></div>
@@ -202,12 +244,13 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
   <div class="empty" id="empty" hidden>No agent matches that search. Try a broader word or pick “All divisions”.</div>
 
   <section class="howto" aria-labelledby="howto-h">
-    <h2 id="howto-h">Put an agent to work</h2>
-    <div class="step"><b>STEP 1</b><h3>Pick your specialists</h3><p>Search the roster and press <em>Add to team</em> on each agent you want. Your picks stay in this browser.</p></div>
-    <div class="step"><b>STEP 2</b><h3>Install them</h3><p>Copy the install script from the team bar and run it. It downloads each agent file into Claude Code's agent folder.</p><pre class="cmd">mkdir -p ~/.claude/agents
+    <h2 id="howto-h">How the agency works</h2>
+    <div class="step"><b>STEP 1</b><h3>Give an agent a job</h3><p>Open any agent and describe the task: paste code to review, a product to position, data to analyze. It works in its own voice and process, and hands back the deliverable. Keep going in the chat to refine it.</p></div>
+    <div class="step"><b>STEP 2</b><h3>Run a team</h3><p>Press <em>Add to team</em> on several agents, open <em>Review &amp; install</em> and give the team one job. Each member takes a turn and builds on the work before it.</p></div>
+    <div class="step"><b>STEP 3</b><h3>Install them</h3><p>To use agents inside Claude Code, copy the team's install script and run it. It downloads each agent file into Claude Code's agent folder.</p><pre class="cmd">mkdir -p ~/.claude/agents
 curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
   https://raw.githubusercontent.com/msitarzewski/agency-agents/main/&lt;path&gt;</pre></div>
-    <div class="step"><b>STEP 3</b><h3>Activate in a session</h3><p>Ask for the agent by name. Other tools (Cursor, Codex, Gemini CLI) are covered by the repo's own installer.</p><pre class="cmd">"Activate Backend Architect mode and
+    <div class="step"><b>STEP 4</b><h3>Activate in a session</h3><p>Ask for the agent by name. Other tools (Cursor, Codex, Gemini CLI) are covered by the repo's own installer.</p><pre class="cmd">"Activate Backend Architect mode and
  design the API for my booking app."</pre></div>
   </section>
 </main>
@@ -238,8 +281,43 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
       <a class="btn" id="d-gh" target="_blank" rel="noopener">View on GitHub ↗</a>
     </div>
     <span class="mono d-path" id="d-path"></span>
+    <div class="tabs" role="tablist" aria-label="Agent views">
+      <button role="tab" id="tab-work" aria-controls="pane-work" aria-selected="true">Give it a job</button>
+      <button role="tab" id="tab-brief" aria-controls="pane-brief" aria-selected="false">Read the brief</button>
+    </div>
   </div>
-  <div class="d-body"><article class="md" id="d-md"></article></div>
+  <section class="pane" id="pane-work" role="tabpanel" aria-labelledby="tab-work">
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="connect" id="connect" hidden>
+      <h3>Connect Claude to run agents</h3>
+      <p>This copy of the site isn't running inside claude.ai, so it needs your own Anthropic API key. The key stays in this browser and is sent only to api.anthropic.com.</p>
+      <form id="key-form" class="key-row">
+        <label for="key-in" hidden>Anthropic API key</label>
+        <input id="key-in" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button class="btn primary" type="submit">Save key</button>
+      </form>
+      <p class="fine">Get a key at console.anthropic.com. Usage is billed to that key.</p>
+    </div>
+    <form class="composer" id="composer">
+      <div class="starters" id="starters"></div>
+      <label for="ask" hidden>Task for this agent</label>
+      <textarea id="ask" rows="3" placeholder="Describe the job. Paste code, copy, data or a brief; the agent works on it and hands back the deliverable. Ctrl+Enter runs it."></textarea>
+      <div class="comp-row">
+        <label class="tier"><span>Depth</span>
+          <select id="tier">
+            <option value="quick">Fast</option>
+            <option value="default" selected>Standard</option>
+            <option value="complex">Deep</option>
+          </select>
+        </label>
+        <span class="engine mono" id="engine">Connecting…</span>
+        <button class="btn" type="button" id="key-forget" hidden>Forget key</button>
+        <button class="btn" type="button" id="chat-clear">New chat</button>
+        <button class="btn primary" type="submit" id="send">Run</button>
+      </div>
+    </form>
+  </section>
+  <div class="d-body" id="pane-brief" role="tabpanel" aria-labelledby="tab-brief" hidden><article class="md" id="d-md"></article></div>
 </aside>
 
 <aside class="drawer" id="team" role="dialog" aria-modal="true" aria-labelledby="team-h" aria-hidden="true">
@@ -249,6 +327,15 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
   </div>
   <div class="d-body">
     <div class="md">
+      <h3 style="margin-top:0">Give the team a job</h3>
+      <p>Each member works on it in turn, in the order below, and builds on what the teammates before them delivered.</p>
+      <form id="job-form" class="job">
+        <label for="job" hidden>Team job</label>
+        <textarea id="job" rows="4" placeholder="Example: Launch plan for a budgeting app for students. Positioning, landing page copy, and a 2-week social calendar."></textarea>
+        <div class="comp-row"><span class="engine mono" id="engine2"></span><button class="btn" type="button" id="job-copy" hidden>Copy full report</button><button class="btn primary" type="submit" id="job-run">Run team</button></div>
+      </form>
+      <div id="job-log"></div>
+      <h3>Install for Claude Code</h3>
       <p>Run this in a terminal to install your picks for Claude Code. Each file lands in <code>~/.claude/agents/</code>.</p>
       <label for="team-script" hidden>Install script</label>
       <textarea class="sheet" id="team-script" readonly rows="10"></textarea>
@@ -304,7 +391,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     const src = d.commit ? `synced from ${d.commit} · ${d.commitDate}` : "";
     $("src").textContent = src; $("foot-src").textContent = src;
     $("sort").value = state.sort;
-    renderChips(); render(); renderTeam(); route();
+    renderChips(); render(); renderTeam(); route(); initEngine();
   }
 
   function renderChips() {
@@ -335,7 +422,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
         <div style="min-width:0"><h3><button data-open="${a.slug}">${esc(a.name)}</button></h3>
         <span class="div-label"><i></i>${esc(d.label)}${a.group ? " · " + esc(a.group) : ""}</span></div></div>
       <p>${esc(blurb)}</p>
-      <div class="card-ft"><span class="mono">${fmt(a.words)} words</span>
+      <div class="card-ft"><button class="card-go" data-open="${a.slug}">Give it a job →</button>
         <button class="pick" data-pick="${a.slug}" aria-pressed="${on}" aria-label="${on ? "Remove" : "Add"} ${esc(a.name)} ${on ? "from" : "to"} team">${on ? "✓ On team" : "+ Add to team"}</button></div>
     </article>`;
   }
@@ -392,17 +479,17 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     $("d-vibe").textContent = a.vibe || a.description;
     $("d-path").textContent = a.path;
     $("d-gh").href = GH + a.path;
-    $("d-md").innerHTML = (a.vibe && a.description ? `<blockquote><p>${esc(a.description)}</p></blockquote>` : "") + renderMd(a.body);
-    $("d-md").querySelectorAll("a[href^='http']").forEach(l => { l.target = "_blank"; l.rel = "noopener"; });
+    a._briefShown = false;
     syncDrawerPick();
-    show("drawer"); $("drawer").querySelector(".d-body").scrollTop = 0;
+    showTab("work"); renderLog(a);
+    show("drawer");
     document.title = a.name + " · The Agency Roster";
   }
   function show(id) {
     ["drawer", "team"].forEach(x => { const on = x === id; $(x).classList.toggle("on", on); $(x).setAttribute("aria-hidden", !on); });
     $("scrim").classList.toggle("on", !!id);
     document.body.style.overflow = id ? "hidden" : "";
-    if (id) setTimeout(() => $(id).querySelector(".close").focus(), 50);
+    if (id) setTimeout(() => (id === "drawer" && !$("composer").hidden ? $("ask") : $(id).querySelector(".close")).focus(), 50);
   }
   function closeAll() {
     show(null); current = null; document.title = "The Agency Roster";
@@ -430,10 +517,276 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     try { navigator.clipboard.writeText(text).then(ok, fail); } catch { fail(); }
   }
 
+  // ---------- Making agents work ----------
+  const MODELS = { quick: "claude-haiku-5-5", default: "claude-sonnet-5-5", complex: "claude-opus-5-5" };
+  const FATAL = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"];
+  const engine = { kind: "pending", sample: null };
+  const getKey = () => { try { return localStorage.getItem("agency.key") || ""; } catch { return ""; } };
+  const setKey = k => { try { k ? localStorage.setItem("agency.key", k) : localStorage.removeItem("agency.key"); } catch {} };
+
+  async function initEngine() {
+    let s = null;
+    if (window.claude && typeof window.claude.use === "function") { try { s = await window.claude.use("sample"); } catch {} }
+    if (s) { engine.kind = "claude"; engine.sample = s; }
+    else engine.kind = getKey() ? "key" : "none";
+    engineUI();
+  }
+  function engineUI() {
+    const t = { pending: "Connecting to Claude…", claude: "Runs on your Claude account", key: "Runs on your Anthropic API key", none: "Not connected", off: "Claude access is off for this page" }[engine.kind];
+    $("engine").textContent = t; $("engine2").textContent = t;
+    $("connect").hidden = engine.kind !== "none";
+    $("composer").hidden = engine.kind === "none";
+    $("key-forget").hidden = engine.kind !== "key";
+    const ready = engine.kind === "claude" || engine.kind === "key";
+    if (!running) $("send").disabled = !ready;
+    if (!jobRun) $("job-run").disabled = !ready;
+  }
+  function handleFatal(e) { if (FATAL.includes(e && e.code)) { engine.kind = "off"; engineUI(); } }
+
+  function rules(a) {
+    return `You are now working as "${a.name}", a specialist in The Agency (${divMap.get(a.division).label} division). Below is your full agent definition. Adopt its identity, expertise, communication style, rules and workflow completely.
+
+How to work:
+- Do the actual job. Put the real, complete deliverable (code, copy, plan, analysis, review, document) in your reply, not a description of what you would do.
+- If important details are missing, state short assumptions and proceed. Ask at most one or two clarifying questions, and only after delivering a first version.
+- Use Markdown: headings, lists, tables and fenced code blocks where they help.
+- You cannot browse the web, run code or remember earlier sessions. Work from what the user gives you, and say so when a task needs live data.
+
+<agent_definition>
+${a.body.slice(0, 80000)}
+</agent_definition>`;
+  }
+
+  function mergeTurns(turns) {
+    const out = [];
+    for (const t of turns) { const l = out[out.length - 1]; if (l && l.role === t.role) l.content += "\n\n" + t.content; else out.push({ role: t.role, content: t.content }); }
+    return out;
+  }
+  async function runAgent(system, turns, opts) {
+    if (engine.kind === "claude") {
+      const r = await engine.sample([{ role: "user", content: system }, ...turns.map(t => ({ role: t.role, content: t.content }))],
+        { cache: false, signal: opts.signal, onText: opts.onText, modelTier: opts.tier });
+      return { text: r.text, truncated: r.truncated };
+    }
+    if (engine.kind === "key") return runWithKey(system, turns, opts);
+    throw { code: "not_connected", message: "Connect Claude first." };
+  }
+  async function runWithKey(system, turns, { onText, signal, tier }) {
+    let res;
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal,
+        headers: { "content-type": "application/json", "x-api-key": getKey(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: MODELS[tier] || MODELS.default, max_tokens: 8192, system, messages: mergeTurns(turns), stream: true })
+      });
+    } catch (e) { throw { code: signal && signal.aborted ? "cancelled" : "upstream_error", message: "Could not reach api.anthropic.com" }; }
+    if (!res.ok) {
+      let m = ""; try { m = (await res.json()).error.message; } catch {}
+      throw { code: res.status === 401 || res.status === 403 ? "bad_key" : res.status === 429 ? "rate_limited" : "upstream_error", message: m || "HTTP " + res.status };
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", text = "", stop = "";
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+          const line = chunk.split("\n").find(l => l.startsWith("data:"));
+          if (!line) continue;
+          let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+          if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") { text += ev.delta.text; onText && onText({ text, delta: ev.delta.text }); }
+          else if (ev.type === "message_delta" && ev.delta) stop = ev.delta.stop_reason || stop;
+          else if (ev.type === "error") throw { code: "upstream_error", message: (ev.error && ev.error.message) || "Stream error", text };
+        }
+      }
+    } catch (e) {
+      if (e && e.code) throw e;
+      throw { code: signal && signal.aborted ? "cancelled" : "upstream_error", message: "Connection dropped", text: text || undefined };
+    }
+    if (!text) throw { code: "empty_completion", message: "No text" };
+    return { text, truncated: stop === "max_tokens" };
+  }
+  function errCopy(e) {
+    const c = e && e.code;
+    const m = {
+      not_granted: "Claude access was declined for this page. Reload the page to be asked again.",
+      sampling_disabled: "Claude isn't available on this account.",
+      rate_limited: e && e.reason === "usage_limit" ? "You've reached your Claude usage limit. Try again later." : "Too many requests right now. Wait a moment, then run it again.",
+      session_expired: "Your session expired. Sign in to claude.ai again.",
+      refused: "Claude declined this request. Rephrase the task and try again.",
+      prompt_too_large: "This conversation is too long. Start a new chat.",
+      bad_key: "That API key was rejected. Forget it and save a valid key.",
+      empty_completion: "No answer came back. Try rephrasing the task.",
+      not_connected: "Connect Claude first."
+    }[c];
+    return m || "The run was interrupted. Run it again." + (engine.kind === "key" && e && e.message ? ` (${e.message})` : "");
+  }
+
+  // Starters
+  const STARTERS = {
+    engineering: ["Review this code for bugs, security and design problems:\n\n", "Design the architecture for: ", "Write a step-by-step implementation plan for: "],
+    design: ["Critique this UI and give concrete fixes: ", "Create a design brief and visual direction for: ", "Write the UX copy for: "],
+    marketing: ["Write a launch plan for: ", "Write 5 ready-to-post social posts about: ", "Audit this landing page copy and rewrite it:\n\n"],
+    "paid-media": ["Build a paid campaign plan with budget split for: ", "Write 5 ad variations for: ", "Audit this campaign and tell me what to change:\n\n"],
+    sales: ["Write a 4-email cold outreach sequence for: ", "Help me handle this objection: ", "Build a discovery call script for: "],
+    product: ["Write a PRD for: ", "Prioritize these feature ideas and explain why:\n\n", "Turn this feedback into product insights:\n\n"],
+    "project-management": ["Build a project plan with milestones for: ", "Write a status report from these notes:\n\n", "Identify the risks in this plan:\n\n"],
+    testing: ["Write a test plan for: ", "Write test cases for this code:\n\n", "Review this feature for edge cases: "],
+    security: ["Threat-model this system: ", "Review this code for vulnerabilities:\n\n", "Write a security checklist for: "],
+    support: ["Draft a reply to this customer message:\n\n", "Write a help-center article about: ", "Build a support playbook for: "],
+    finance: ["Build a simple financial model outline for: ", "Analyze these numbers and tell me what stands out:\n\n", "Write a budget plan for: "],
+    "game-development": ["Design the core game loop for: ", "Write a game design document outline for: ", "Help me implement this mechanic: "],
+    academic: ["Analyze this topic from your discipline: ", "Critique this argument:\n\n", "Design a study to answer: "],
+    research: ["Synthesize these findings into insights:\n\n", "Design a research plan for: ", "Summarize and critique:\n\n"]
+  };
+  function renderStarters(a, show) {
+    const box = $("starters");
+    if (!show) { box.innerHTML = ""; return; }
+    const list = STARTERS[a.division] || ["Here is my situation. Give me your plan: ", "Review this and tell me what to fix:\n\n", "Create a deliverable for: "];
+    box.innerHTML = `<button type="button" data-go="intro">What can you do for me?</button>` + list.map((s, i) => `<button type="button" data-fill="${i}">${esc(s.replace(/[:\s]+$/, ""))}…</button>`).join("");
+    box._list = list;
+  }
+
+  // Chat
+  const chats = {};
+  let running = null;
+  const loadChat = slug => chats[slug] || (chats[slug] = store.get("agency.chat." + slug, []).filter(t => t && t.content));
+  const saveChat = slug => store.set("agency.chat." + slug, chats[slug].slice(-30));
+  function msgEl(t, a) {
+    const d = document.createElement("div");
+    d.className = "msg " + (t.role === "user" ? "user" : "ai");
+    if (t.role === "user") d.textContent = t.content;
+    else {
+      d.innerHTML = `<div class="md"></div><div class="msg-ft"><span class="mono"></span><button type="button" data-copyans>Copy</button></div>`;
+      d.querySelector(".md").innerHTML = renderMd(t.content);
+      d.querySelector(".mono").textContent = a.name + (t.note ? " · " + t.note : "");
+      d._text = t.content;
+    }
+    return d;
+  }
+  function renderLog(a, note) {
+    const log = $("log"), turns = loadChat(a.slug);
+    log.innerHTML = "";
+    if (!turns.length) {
+      const p = document.createElement("p"); p.className = "hello";
+      p.innerHTML = `<strong></strong> is ready to work. <span></span> Describe the job below, or start from a suggestion.`;
+      p.querySelector("strong").textContent = a.name; p.querySelector("span").textContent = a.description;
+      log.append(p);
+    }
+    turns.forEach(t => log.append(msgEl(t, a)));
+    if (running && running.slug === a.slug) log.append(running.el);
+    if (note) { const n = document.createElement("p"); n.className = "note"; n.textContent = note; log.append(n); }
+    renderStarters(a, !turns.length);
+    log.scrollTop = log.scrollHeight;
+  }
+  function setBusy(b) { $("send").textContent = b ? "Stop" : "Run"; $("send").disabled = false; $("chat-clear").disabled = b; if (!b) engineUI(); }
+  async function send(text) {
+    const a = current;
+    text = (text || "").trim();
+    if (!a || !text || running || !(engine.kind === "claude" || engine.kind === "key")) return;
+    const turns = loadChat(a.slug);
+    turns.push({ role: "user", content: text }); saveChat(a.slug);
+    $("ask").value = "";
+    const el = document.createElement("div"); el.className = "msg ai";
+    el.innerHTML = `<div class="md"><p class="thinking">Working on it…</p></div><div class="msg-ft"><span class="mono"></span><button type="button" data-stop>Stop</button></div>`;
+    el.querySelector(".mono").textContent = a.name + " · working";
+    const ctl = new AbortController();
+    running = { ctl, slug: a.slug, el }; setBusy(true);
+    renderLog(a);
+    const md = el.querySelector(".md"), log = $("log");
+    let raf = 0, latest = "", note = "";
+    const paint = () => {
+      raf = 0;
+      const near = log.scrollHeight - log.scrollTop - log.clientHeight < 140;
+      md.innerHTML = renderMd(latest);
+      if (near && current && current.slug === a.slug) log.scrollTop = log.scrollHeight;
+    };
+    try {
+      const history = turns.slice(-20);
+      while (history.length && history[0].role !== "user") history.shift();
+      const r = await runAgent(rules(a), history, { signal: ctl.signal, tier: $("tier").value, onText: ({ text }) => { latest = text; if (!raf) raf = requestAnimationFrame(paint); } });
+      turns.push({ role: "assistant", content: r.text, note: r.truncated ? "cut short, ask it to continue" : "" });
+    } catch (e) {
+      if (e && e.text) turns.push({ role: "assistant", content: e.text, note: e.code === "cancelled" ? "stopped" : "interrupted" });
+      if (!e || e.code !== "cancelled") note = errCopy(e);
+      handleFatal(e);
+    } finally {
+      cancelAnimationFrame(raf);
+      running = null; saveChat(a.slug); setBusy(false);
+      if (current && current.slug === a.slug) renderLog(a, note);
+      else if (note) toast(note);
+    }
+  }
+  function showTab(which) {
+    const work = which === "work";
+    $("tab-work").setAttribute("aria-selected", work); $("tab-brief").setAttribute("aria-selected", !work);
+    $("pane-work").hidden = !work; $("pane-brief").hidden = work;
+    if (!work && current && !current._briefShown) {
+      const a = current;
+      $("d-md").innerHTML = (a.vibe && a.description ? `<blockquote><p>${esc(a.description)}</p></blockquote>` : "") + renderMd(a.body);
+      $("d-md").querySelectorAll("a[href^='http']").forEach(l => { l.target = "_blank"; l.rel = "noopener"; });
+      $("pane-brief").scrollTop = 0;
+      bySlug.forEach(x => x._briefShown = false); a._briefShown = true;
+    }
+  }
+
+  // Team job
+  let jobRun = null, jobReport = "";
+  async function runTeam(job) {
+    job = job.trim();
+    const members = [...team].map(s => bySlug.get(s));
+    if (!members.length) return toast("Add agents to your team first");
+    if (!job) { $("job").focus(); return toast("Describe the job first"); }
+    if (!(engine.kind === "claude" || engine.kind === "key")) return toast(engine.kind === "none" ? "Connect Claude first: open any agent to add your key" : "Claude isn't available here");
+    const log = $("job-log"); log.innerHTML = "";
+    const boxes = members.map((a, i) => {
+      const b = document.createElement("div"); b.className = "job-step";
+      b.innerHTML = `<h4><span></span><span></span><small>${i + 1} of ${members.length}</small></h4><div class="md"><p class="thinking">Waiting for teammates…</p></div>`;
+      b.querySelectorAll("h4 span")[0].textContent = a.emoji || "•"; b.querySelectorAll("h4 span")[1].textContent = a.name;
+      log.append(b); return b;
+    });
+    const ctl = new AbortController(); jobRun = ctl;
+    $("job-run").textContent = "Stop"; $("job-copy").hidden = true;
+    jobReport = `# Team job\n\n${job}\n\nTeam: ${members.map(m => m.name).join(", ")}`;
+    const done = [];
+    for (let i = 0; i < members.length; i++) {
+      const a = members[i], md = boxes[i].querySelector(".md");
+      md.innerHTML = `<p class="thinking">Working on it…</p>`;
+      const prior = done.map(d => `## ${d.name}\n\n${d.text.slice(0, 12000)}`).join("\n\n");
+      const prompt = `TEAM JOB:\n${job}\n\nYou are member ${i + 1} of ${members.length} on this team: ${members.map(m => m.name).join(", ")}.\n\n` +
+        (prior ? `Your teammates have already delivered the work below. Build on it, don't repeat it, and fix anything in your area that's wrong.\n\n<teammate_work>\n${prior}\n</teammate_work>\n\n`
+               : "You go first. Lay groundwork the teammates after you can build on.\n\n") +
+        "Deliver your part of the job from your specialty now. Open with a one-line heading that names your contribution.";
+      let raf = 0, latest = "";
+      try {
+        const r = await runAgent(rules(a), [{ role: "user", content: prompt }], { signal: ctl.signal, tier: "default",
+          onText: ({ text }) => { latest = text; if (!raf) raf = requestAnimationFrame(() => { raf = 0; md.innerHTML = renderMd(latest); }); } });
+        cancelAnimationFrame(raf);
+        md.innerHTML = renderMd(r.text);
+        done.push({ name: a.name, text: r.text });
+        jobReport += `\n\n---\n\n## ${a.name}\n\n${r.text}`;
+      } catch (e) {
+        cancelAnimationFrame(raf);
+        md.innerHTML = (e && e.text ? renderMd(e.text) : "") + `<p class="note">${esc(e && e.code === "cancelled" ? "Stopped." : errCopy(e))}</p>`;
+        handleFatal(e);
+        for (let j = i + 1; j < members.length; j++) boxes[j].querySelector(".md").innerHTML = `<p class="note">Didn't run.</p>`;
+        break;
+      }
+    }
+    jobRun = null; $("job-run").textContent = "Run team"; $("job-copy").hidden = !done.length; engineUI();
+  }
+
   // Events
   document.addEventListener("click", e => {
     const p = e.target.closest("[data-pick]"); if (p) { e.preventDefault(); toggleTeam(p.dataset.pick); return; }
     const o = e.target.closest("[data-open]"); if (o) { location.hash = o.dataset.open; return; }
+    if (e.target.closest("[data-stop]")) { running && running.ctl.abort(); return; }
+    const ca = e.target.closest("[data-copyans]"); if (ca) { copy(ca.closest(".msg")._text, "Answer copied"); return; }
+    const go = e.target.closest("[data-go]"); if (go) { send("Introduce yourself in a few lines, then list the concrete deliverables you can produce for me, with one short example of your work."); return; }
+    const fill = e.target.closest("[data-fill]"); if (fill) { const v = $("starters")._list[+fill.dataset.fill]; $("ask").value = v; $("ask").focus(); $("ask").setSelectionRange(v.length, v.length); return; }
     const c = e.target.closest(".chip"); if (c) { state.div = c.dataset.div; store.set("agency.div", state.div); renderChips(); render(); }
   });
   $("q").addEventListener("input", e => { state.q = e.target.value.trim(); render(); });
@@ -444,13 +797,22 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
   $("d-pick").addEventListener("click", () => current && toggleTeam(current.slug));
   $("d-copy").addEventListener("click", () => current && copy(current.body, "Prompt copied"));
   $("d-cmd").addEventListener("click", () => current && copy(`mkdir -p ~/.claude/agents && curl -fsSL -o ~/.claude/agents/${current.path.split("/").pop()} ${RAW}${current.path}`, "Install command copied"));
+  $("tab-work").addEventListener("click", () => showTab("work"));
+  $("tab-brief").addEventListener("click", () => showTab("brief"));
+  $("composer").addEventListener("submit", e => { e.preventDefault(); running ? running.ctl.abort() : send($("ask").value); });
+  $("ask").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!running) send($("ask").value); } });
+  $("chat-clear").addEventListener("click", () => { if (!current || running) return; chats[current.slug] = []; saveChat(current.slug); renderLog(current); $("ask").focus(); });
+  $("key-form").addEventListener("submit", e => { e.preventDefault(); const k = $("key-in").value.trim(); if (!k) return; setKey(k); $("key-in").value = ""; engine.kind = "key"; engineUI(); toast("Key saved in this browser"); $("ask").focus(); });
+  $("key-forget").addEventListener("click", () => { setKey(""); engine.kind = "none"; engineUI(); toast("Key removed"); });
+  $("job-form").addEventListener("submit", e => { e.preventDefault(); jobRun ? jobRun.abort() : runTeam($("job").value); });
+  $("job-copy").addEventListener("click", () => copy(jobReport, "Report copied"));
   $("tray-open").addEventListener("click", () => { location.hash = "team"; });
   $("tray-clear").addEventListener("click", clearTeam);
   $("team-clear").addEventListener("click", clearTeam);
   $("team-copy").addEventListener("click", () => team.size ? copy(script(), "Install script copied", $("team-script")) : toast("Add agents to your team first"));
   function clearTeam() { const s = [...team]; team.clear(); store.set("agency.team", []); s.forEach(x => document.querySelectorAll(`[data-pick="${x}"]`).forEach(b => { b.setAttribute("aria-pressed", false); b.textContent = "+ Add to team"; })); if (current) syncDrawerPick(); renderTeam(); toast("Team cleared"); }
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && $("scrim").classList.contains("on")) closeAll();
+    if (e.key === "Escape" && $("scrim").classList.contains("on") && !(e.target.tagName === "TEXTAREA" && e.target.value)) closeAll();
     else if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") { e.preventDefault(); $("q").focus(); }
   });
 })();
