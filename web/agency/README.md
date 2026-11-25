@@ -71,4 +71,4 @@ Visitors there run agents with their own Anthropic API key.
 
 The app previously ran the Desk Six Kraken bot. Its last bot version is
 `1794604981493` in the app's version history (restore with AppDeploy's
-apply_app_version). The bot's Kraken API key secrets are still stored on the app.
+apply_app_version). The bot's Kraken API keys were deleted from the app, so restoring it needs new keys.
