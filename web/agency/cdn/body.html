@@ -1,0 +1,213 @@
+<div class="wrap">
+  <nav class="nav" aria-label="Main">
+    <a class="mark" href="#" aria-label="The Agency Roster, top"><span class="mark-dots" id="mark-dots" aria-hidden="true"></span>The Agency</a>
+    <div class="nav-links">
+      <a href="#autopilot">Autopilot</a>
+      <a href="#departments">Departments</a>
+      <a href="#roster">Roster</a>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">GitHub ↗</a>
+      <span class="pill" id="nav-engine"><i></i><span>Connecting</span></span>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Open source · MIT · Runs on Claude</p>
+      <h1><span id="h-count">283</span> specialists. One agency. <span class="out">Brief anyone.</span></h1>
+      <p class="lede">Engineers, designers, marketers, analysts and more from the <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">agency-agents</a> collection. Give any one of them a job and they do the work right here. Or put a team together and hand them a job to share.</p>
+      <div class="cta">
+        <a class="btn primary lg" href="#roster" id="cta-roster">Find a specialist</a>
+        <a class="btn lg" href="#autopilot">Start autopilot</a>
+      </div>
+      <div class="stats" aria-live="polite">
+        <div><b id="t-agents">–</b><span>Agents</span></div>
+        <div><b id="t-divs">–</b><span>Departments</span></div>
+        <div><b id="t-words">–</b><span>Words of expertise</span></div>
+      </div>
+    </div>
+    <div class="wall-box">
+      <div class="wall-hd"><b>The whole staff</b><span class="mono" id="wall-hint">Hover to meet them. Click to brief.</span></div>
+      <div class="wall" id="wall" role="group" aria-label="Every agent, coloured by department"></div>
+      <div class="tip" id="tip" aria-hidden="true"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </header>
+</div>
+
+<section class="sec wrap" id="autopilot" aria-labelledby="ap-h">
+  <div class="sec-hd">
+    <div><p class="eyebrow">Autopilot</p><h2 id="ap-h">Set a goal. The agency runs itself.</h2></div>
+    <p>The Agents Orchestrator plans the work and picks the specialists. Each one delivers their part in turn, building on the last. You get a launch kit: the finished assets plus the exact steps to take them to market and get paid.</p>
+  </div>
+  <div class="ap">
+    <form class="ap-form" id="ap-form">
+      <label class="lbl" for="ap-goal">Your business goal</label>
+      <textarea id="ap-goal" rows="4" placeholder="Example: Earn my first $1,000 selling Notion templates to freelancers."></textarea>
+      <div class="ap-ideas" id="ap-ideas"></div>
+      <div class="comp-row">
+        <label class="tier"><span>Specialists</span>
+          <select id="ap-size"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option></select>
+        </label>
+        <span class="engine mono" id="engine3"></span>
+      </div>
+      <div class="comp-row"><button class="btn" type="button" id="ap-copy" hidden>Copy launch kit</button><button class="btn primary lg" type="submit" id="ap-run" style="margin-left:auto">Start autopilot</button></div>
+      <p class="fine-print">The agents do the work; you launch it. They can't take payments, post, send email or spend money on their own, so nothing goes out without you. Revenue figures are estimates with stated assumptions, not promises.</p>
+    </form>
+    <div class="ap-board" id="ap-board" aria-live="polite"></div>
+  </div>
+</section>
+
+<section class="sec wrap" id="departments" aria-labelledby="dept-h">
+  <div class="sec-hd">
+    <div><p class="eyebrow">Departments</p><h2 id="dept-h">Eighteen departments, one roster</h2></div>
+    <p>Pick a department to see everyone in it. Each specialist comes with a full brief: identity, rules, workflow and the deliverables they produce.</p>
+  </div>
+  <div class="depts" id="depts"></div>
+</section>
+
+<div class="bar" id="roster">
+  <div class="wrap">
+    <div class="bar-in">
+      <label class="search">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span hidden>Search agents</span>
+        <input id="q" type="search" placeholder="Search by role, skill or vibe: “SEO”, “Unity”, “threat model”…" autocomplete="off">
+        <kbd>/</kbd>
+      </label>
+      <label><span hidden>Sort</span>
+        <select id="sort">
+          <option value="div">By department</option>
+          <option value="az">A to Z</option>
+          <option value="long">Longest brief</option>
+        </select>
+      </label>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Filter by department"></div>
+  </div>
+</div>
+
+<main class="wrap roster">
+  <div class="status"><p id="count" aria-live="polite">Loading the roster…</p><p class="mono" id="src"></p></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>No agent matches that search. Try a broader word or pick “All departments”.</div>
+</main>
+
+<section class="sec wrap" id="how" aria-labelledby="how-h">
+  <div class="sec-hd">
+    <div><p class="eyebrow">How it works</p><h2 id="how-h">From brief to deliverable</h2></div>
+    <p>Each agent runs on Claude with its full brief as instructions, so you get the specialist's process and voice, not a generic answer.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><div class="step-n" aria-hidden="true">01</div><h3>Give an agent a job</h3><p>Open any agent and describe the task: paste code to review, a product to position, data to analyze. You get the deliverable back, and you can keep refining it in the chat.</p></div>
+    <div class="step"><div class="step-n" aria-hidden="true">02</div><h3>Run a team</h3><p>Press <em>Add to team</em> on several agents, open <em>Review &amp; install</em> and give the team one job. Each member takes a turn and builds on the work before it.</p></div>
+    <div class="step"><div class="step-n" aria-hidden="true">03</div><h3>Install them</h3><p>To use agents inside Claude Code, copy the team's install script and run it.</p><pre class="cmd">mkdir -p ~/.claude/agents
+curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
+  https://raw.githubusercontent.com/msitarzewski/agency-agents/main/&lt;path&gt;</pre></div>
+    <div class="step"><div class="step-n" aria-hidden="true">04</div><h3>Activate in a session</h3><p>Ask for the agent by name. Cursor, Codex and Gemini CLI are covered by the repo's own installer.</p><pre class="cmd">"Activate Backend Architect mode and
+ design the API for my booking app."</pre></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p class="big" aria-hidden="true">THE <span>AGENCY</span></p>
+    <div class="foot">
+      <span>Agent content © AgentLand Contributors, MIT License. Source: <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">msitarzewski/agency-agents</a>.</span>
+      <span class="mono" id="foot-src"></span>
+    </div>
+  </div>
+</footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-name" aria-hidden="true">
+  <div class="d-hd">
+    <div class="d-row">
+      <div class="ava" id="d-ava"></div>
+      <div style="min-width:0">
+        <span class="div-label" id="d-div"></span>
+        <h2 id="d-name"></h2>
+        <p class="d-vibe" id="d-vibe"></p>
+      </div>
+      <button class="close" id="d-close" aria-label="Close">×</button>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="d-pick">Add to team</button>
+      <button class="btn" id="d-copy">Copy prompt</button>
+      <button class="btn" id="d-cmd">Copy install command</button>
+      <a class="btn" id="d-gh" target="_blank" rel="noopener">View on GitHub ↗</a>
+    </div>
+    <span class="mono d-path" id="d-path"></span>
+    <div class="tabs" role="tablist" aria-label="Agent views">
+      <button role="tab" id="tab-work" aria-controls="pane-work" aria-selected="true">Give it a job</button>
+      <button role="tab" id="tab-brief" aria-controls="pane-brief" aria-selected="false">Read the brief</button>
+    </div>
+  </div>
+  <section class="pane" id="pane-work" role="tabpanel" aria-labelledby="tab-work">
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="connect" id="connect" hidden>
+      <h3>Connect Claude to run agents</h3>
+      <p>This copy of the site isn't running inside claude.ai, so it needs your own Anthropic API key. The key stays in this browser and is sent only to api.anthropic.com.</p>
+      <form id="key-form" class="key-row">
+        <label for="key-in" hidden>Anthropic API key</label>
+        <input id="key-in" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button class="btn primary" type="submit">Save key</button>
+      </form>
+      <p class="fine">Get a key at console.anthropic.com. Usage is billed to that key.</p>
+    </div>
+    <form class="composer" id="composer">
+      <div class="starters" id="starters"></div>
+      <label for="ask" hidden>Task for this agent</label>
+      <textarea id="ask" rows="3" placeholder="Describe the job. Paste code, copy, data or a brief; the agent works on it and hands back the deliverable. Ctrl+Enter runs it."></textarea>
+      <div class="comp-row">
+        <label class="tier"><span>Depth</span>
+          <select id="tier">
+            <option value="quick">Fast</option>
+            <option value="default" selected>Standard</option>
+            <option value="complex">Deep</option>
+          </select>
+        </label>
+        <span class="engine mono" id="engine">Connecting…</span>
+        <button class="btn" type="button" id="key-forget" hidden>Forget key</button>
+        <button class="btn" type="button" id="chat-clear">New chat</button>
+        <button class="btn primary" type="submit" id="send">Run</button>
+      </div>
+    </form>
+  </section>
+  <div class="d-body" id="pane-brief" role="tabpanel" aria-labelledby="tab-brief" hidden><article class="md" id="d-md"></article></div>
+</aside>
+
+<aside class="drawer" id="team" role="dialog" aria-modal="true" aria-labelledby="team-h" aria-hidden="true">
+  <div class="d-hd team-hd">
+    <div class="d-row"><div style="min-width:0"><span class="div-label">Your team</span><h2 id="team-h">Team room</h2><p class="d-vibe" id="team-sub"></p></div><button class="close" id="team-close" aria-label="Close">×</button></div>
+    <div class="actions"><button class="btn primary" id="team-copy">Copy install script</button><button class="btn" id="team-clear">Remove everyone</button></div>
+  </div>
+  <div class="d-body">
+    <div class="md">
+      <h3 style="margin-top:0">Give the team a job</h3>
+      <p>Each member works on it in turn, in the order below, and builds on what the teammates before them delivered.</p>
+      <form id="job-form" class="job">
+        <label for="job" hidden>Team job</label>
+        <textarea id="job" rows="4" placeholder="Example: Launch plan for a budgeting app for students. Positioning, landing page copy, and a 2-week social calendar."></textarea>
+        <div class="comp-row"><span class="engine mono" id="engine2"></span><button class="btn" type="button" id="job-copy" hidden>Copy full report</button><button class="btn primary" type="submit" id="job-run">Run team</button></div>
+      </form>
+      <div id="job-log"></div>
+      <h3>Install for Claude Code</h3>
+      <p>Run this in a terminal to install your picks for Claude Code. Each file lands in <code>~/.claude/agents/</code>.</p>
+      <label for="team-script" hidden>Install script</label>
+      <textarea class="sheet" id="team-script" readonly rows="10"></textarea>
+      <h3>Members</h3>
+      <ul id="team-list"></ul>
+    </div>
+  </div>
+</aside>
+
+<div class="tray" id="tray">
+  <div class="tray-in">
+    <strong id="tray-n">0 agents</strong>
+    <span class="tray-names" id="tray-names"></span>
+    <button class="btn" id="tray-clear">Clear</button>
+    <button class="btn primary" id="tray-open">Review &amp; install</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>

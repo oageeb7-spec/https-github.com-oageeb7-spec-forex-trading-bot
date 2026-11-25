@@ -110,8 +110,28 @@ def main():
         '</head>\n<body>\n' + (HERE / "template.html").read_text(encoding="utf-8") + '\n</body>\n</html>\n'
     )
     (HERE / "index.html").write_text(page, encoding="utf-8")
+    write_cdn_assets()
     print(f"Wrote index.html and {dest} with {len(agents)} agents in {len(out['divisions'])} divisions "
           f"({dest.stat().st_size / 1e6:.1f} MB) from commit {sha or 'unknown'}")
+
+
+def write_cdn_assets():
+    """Split template.html into cdn/app.css, cdn/app.js and cdn/body.html.
+
+    A host that serves only a small HTML shell (desksix.com on AppDeploy) loads
+    app.css, app.js and agents.json from a pinned commit through jsDelivr and
+    embeds body.html as its markup.
+    """
+    s = (HERE / "template.html").read_text(encoding="utf-8")
+    i, j = s.index("<style>"), s.index("</style>")
+    rest = s[j + len("</style>"):]
+    k = rest.index('<script src="https://cdnjs')
+    m = rest.index("<script>\n", k)
+    out = HERE / "cdn"
+    out.mkdir(exist_ok=True)
+    (out / "app.css").write_text(s[i + len("<style>"):j].strip() + "\n", encoding="utf-8")
+    (out / "app.js").write_text(rest[m + len("<script>\n"):rest.rindex("</script>")], encoding="utf-8")
+    (out / "body.html").write_text(rest[:k].strip() + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

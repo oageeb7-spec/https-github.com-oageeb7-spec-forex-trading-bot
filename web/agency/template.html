@@ -554,7 +554,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
   let team = new Set(store.get("agency.team", []));
   let current = null;
 
-  fetch("agents.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  fetch(window.AGENCY_DATA_URL || "agents.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(init)
     .catch(() => { $("count").textContent = "The roster file (agents.json) did not load. Serve this folder over HTTP, e.g. python3 -m http.server, and reload."; });
 
