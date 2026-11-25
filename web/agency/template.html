@@ -11,7 +11,7 @@
   --ink:#0B0F1A; --muted:#565D76; --line:#D2D7E3;
   --accent:#0B0F1A; --accent-ink:#FFFFFF;
   --hi:#3341F2; --hi-soft:#E3E6FF;
-  --ok:#11764A;
+  --ok:#11764A; --warn:#C2410C;
   --shadow:0 30px 80px -30px rgba(11,15,26,.45);
   --f-display:"Archivo","Instrument Sans",system-ui,sans-serif;
   --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -23,13 +23,13 @@
   --ink:#EDEFF6; --muted:#9299B0; --line:#242938;
   --accent:#EDEFF6; --accent-ink:#08090E;
   --hi:#929CFF; --hi-soft:#1C2040;
-  --ok:#5AD39A; --shadow:0 30px 80px -30px rgba(0,0,0,.85); color-scheme:dark}}
+  --ok:#5AD39A; --warn:#FB923C; --shadow:0 30px 80px -30px rgba(0,0,0,.85); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#08090E; --surface:#10131B; --sunken:#181C27; --raised:#141824;
   --ink:#EDEFF6; --muted:#9299B0; --line:#242938;
   --accent:#EDEFF6; --accent-ink:#08090E;
   --hi:#929CFF; --hi-soft:#1C2040;
-  --ok:#5AD39A; --shadow:0 30px 80px -30px rgba(0,0,0,.85); color-scheme:dark}
+  --ok:#5AD39A; --warn:#FB923C; --shadow:0 30px 80px -30px rgba(0,0,0,.85); color-scheme:dark}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -97,6 +97,44 @@ h1 .out{color:transparent;-webkit-text-stroke:1.5px var(--ink);display:block}
 .sec-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.8rem}
 h2{font-family:var(--f-display);font-weight:800;font-size:clamp(1.9rem,3.6vw,2.9rem);line-height:.95;letter-spacing:-.03em;margin:.5rem 0 0;text-wrap:balance;font-stretch:112%;font-variation-settings:"wdth" 112}
 .sec-hd p{color:var(--muted);max-width:44ch;margin:0}
+
+/* Autopilot */
+.ap{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;align-items:start}
+.ap-form{background:var(--ink);color:var(--bg);border-radius:22px;padding:1.4rem;display:flex;flex-direction:column;gap:.8rem;position:sticky;top:calc(1rem + env(safe-area-inset-top,0px))}
+.ap-form .lbl{font-family:var(--f-mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.16em;opacity:.7}
+.ap-form textarea{font:inherit;font-size:1.05rem;width:100%;padding:.85rem 1rem;border:1px solid color-mix(in srgb,var(--bg) 22%,transparent);border-radius:14px;background:color-mix(in srgb,var(--bg) 7%,var(--ink));color:var(--bg);resize:vertical}
+.ap-form textarea::placeholder{color:color-mix(in srgb,var(--bg) 50%,transparent)}
+.ap-form textarea:focus{outline:none;border-color:var(--hi)}
+.ap-ideas{display:flex;flex-wrap:wrap;gap:.35rem}
+.ap-ideas button{border:1px solid color-mix(in srgb,var(--bg) 22%,transparent);background:none;color:color-mix(in srgb,var(--bg) 78%,transparent);border-radius:999px;padding:.3rem .75rem;font-size:.78rem;text-align:left}
+.ap-ideas button:hover{color:var(--bg);border-color:var(--bg)}
+.ap-form .comp-row .engine{color:color-mix(in srgb,var(--bg) 60%,transparent)}
+.ap-form .tier{color:color-mix(in srgb,var(--bg) 70%,transparent)}
+.ap-form select{background:var(--ink);color:var(--bg);border-color:color-mix(in srgb,var(--bg) 25%,transparent)}
+.ap-form .btn{background:transparent;color:var(--bg);border-color:color-mix(in srgb,var(--bg) 30%,transparent)}
+.ap-form .btn.primary{background:var(--bg);color:var(--ink);border-color:var(--bg)}
+.fine-print{margin:0;font-size:.78rem;line-height:1.5;color:color-mix(in srgb,var(--bg) 62%,transparent);border-top:1px solid color-mix(in srgb,var(--bg) 15%,transparent);padding-top:.8rem}
+.ap-board{display:flex;flex-direction:column;gap:10px;min-width:0}
+.ap-empty{border:1px dashed var(--line);border-radius:22px;padding:2rem 1.5rem;display:flex;flex-direction:column;gap:1.4rem}
+.flow{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.flow span{display:inline-flex;align-items:center;gap:.5rem;padding:.55rem .9rem;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-weight:600;font-size:.88rem}
+.flow b{font-family:var(--f-mono);font-size:.68rem;color:var(--muted);font-weight:400}
+.flow i{flex:1;min-width:18px;height:1px;border-top:1px dashed var(--muted)}
+.ap-empty p{margin:0;color:var(--muted);max-width:60ch}
+.ap-step{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-width:0}
+.ap-step.kit{border-color:var(--ink);box-shadow:var(--shadow)}
+.ap-step summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:.8rem;padding:.85rem 1rem}
+.ap-step summary::-webkit-details-marker{display:none}
+.ap-step summary .ava{width:40px;height:40px;font-size:1.15rem}
+.ap-who{min-width:0;flex:1}
+.ap-who b{display:block;font-family:var(--f-display);font-stretch:108%;font-variation-settings:"wdth" 108;line-height:1.2}
+.ap-who small{display:block;color:var(--muted);font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.state{flex:none;font-family:var(--f-mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.1em;padding:.25rem .6rem;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.state.working{color:var(--hi);border-color:var(--hi)}
+.state.done{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,var(--line))}
+.state.failed{color:var(--warn);border-color:var(--warn)}
+.ap-step .md{padding:0 1.1rem 1rem;max-width:none;border-top:1px solid var(--line);padding-top:1rem}
+.ap-num{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);width:1.6rem;flex:none}
 
 /* Departments */
 .depts{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:10px}
@@ -260,6 +298,8 @@ textarea#ask:focus,textarea#job:focus,.key-row input:focus{outline:none;border-c
 
 @media (max-width:980px){
   .hero{grid-template-columns:1fr}
+  .ap{grid-template-columns:1fr}
+  .ap-form{position:static}
   .nav-links a{display:none}
 }
 @media (max-width:640px){
@@ -285,6 +325,7 @@ textarea#ask:focus,textarea#job:focus,.key-row input:focus{outline:none;border-c
   <nav class="nav" aria-label="Main">
     <a class="mark" href="#" aria-label="The Agency Roster, top"><span class="mark-dots" id="mark-dots" aria-hidden="true"></span>The Agency</a>
     <div class="nav-links">
+      <a href="#autopilot">Autopilot</a>
       <a href="#departments">Departments</a>
       <a href="#roster">Roster</a>
       <a href="#how">How it works</a>
@@ -300,7 +341,7 @@ textarea#ask:focus,textarea#job:focus,.key-row input:focus{outline:none;border-c
       <p class="lede">Engineers, designers, marketers, analysts and more from the <a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">agency-agents</a> collection. Give any one of them a job and they do the work right here. Or put a team together and hand them a job to share.</p>
       <div class="cta">
         <a class="btn primary lg" href="#roster" id="cta-roster">Find a specialist</a>
-        <a class="btn lg" href="#how">How it works</a>
+        <a class="btn lg" href="#autopilot">Start autopilot</a>
       </div>
       <div class="stats" aria-live="polite">
         <div><b id="t-agents">–</b><span>Agents</span></div>
@@ -316,6 +357,29 @@ textarea#ask:focus,textarea#job:focus,.key-row input:focus{outline:none;border-c
     </div>
   </header>
 </div>
+
+<section class="sec wrap" id="autopilot" aria-labelledby="ap-h">
+  <div class="sec-hd">
+    <div><p class="eyebrow">Autopilot</p><h2 id="ap-h">Set a goal. The agency runs itself.</h2></div>
+    <p>The Agents Orchestrator plans the work and picks the specialists. Each one delivers their part in turn, building on the last. You get a launch kit: the finished assets plus the exact steps to take them to market and get paid.</p>
+  </div>
+  <div class="ap">
+    <form class="ap-form" id="ap-form">
+      <label class="lbl" for="ap-goal">Your business goal</label>
+      <textarea id="ap-goal" rows="4" placeholder="Example: Earn my first $1,000 selling Notion templates to freelancers."></textarea>
+      <div class="ap-ideas" id="ap-ideas"></div>
+      <div class="comp-row">
+        <label class="tier"><span>Specialists</span>
+          <select id="ap-size"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option></select>
+        </label>
+        <span class="engine mono" id="engine3"></span>
+      </div>
+      <div class="comp-row"><button class="btn" type="button" id="ap-copy" hidden>Copy launch kit</button><button class="btn primary lg" type="submit" id="ap-run" style="margin-left:auto">Start autopilot</button></div>
+      <p class="fine-print">The agents do the work; you launch it. They can't take payments, post, send email or spend money on their own, so nothing goes out without you. Revenue figures are estimates with stated assumptions, not promises.</p>
+    </form>
+    <div class="ap-board" id="ap-board" aria-live="polite"></div>
+  </div>
+</section>
 
 <section class="sec wrap" id="departments" aria-labelledby="dept-h">
   <div class="sec-hd">
@@ -508,7 +572,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     $("src").textContent = src; $("foot-src").textContent = src;
     $("sort").value = state.sort;
     $("h-count").textContent = fmt(d.agents.length);
-    renderWall(); renderDepts();
+    renderWall(); renderDepts(); initAutopilot();
     renderChips(); render(); renderTeam(); route(); initEngine();
   }
 
@@ -697,6 +761,8 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     const ready = engine.kind === "claude" || engine.kind === "key";
     if (!running) $("send").disabled = !ready;
     if (!jobRun) $("job-run").disabled = !ready;
+    $("engine3").textContent = engine.kind === "none" ? "Add an API key: open any agent" : t;
+    if (!apRun) $("ap-run").disabled = !ready;
   }
   function handleFatal(e) { if (FATAL.includes(e && e.code)) { engine.kind = "off"; engineUI(); } }
 
@@ -936,6 +1002,145 @@ ${a.body.slice(0, 80000)}
     jobRun = null; $("job-run").textContent = "Run team"; $("job-copy").hidden = !done.length; engineUI();
   }
 
+  // ---------- Autopilot ----------
+  const DIRECTOR = "agents-orchestrator";
+  const IDEAS = [
+    "Earn my first $1,000 selling Notion templates to freelancers",
+    "Launch a $49/month website audit service for local restaurants",
+    "Grow a remote-jobs newsletter to 1,000 subscribers and sell sponsorships",
+    "Sell a $29 guide that teaches small shops to use AI for customer support"
+  ];
+  const GUARD = "Ground rules for the whole team: use only legitimate, legal business methods. No spam, fake reviews, deception, scraping personal data or get-rich-quick schemes. Never invent results, customers, testimonials or statistics; label every projected number as an estimate and state its assumptions. Nobody on the team can browse, post, send, buy or take payments: produce ready-to-use assets and say exactly what the human must do to launch them.";
+  let apRun = null, apState = store.get("agency.autopilot", null);
+
+  function director() { return bySlug.get(DIRECTOR) || data.agents.find(a => a.division === "project-management") || data.agents[0]; }
+  function rosterIndex() {
+    return data.agents.filter(a => a.slug !== DIRECTOR).map(a => `${a.slug} | ${a.name} | ${(a.vibe || a.description).slice(0, 90)}`).join("\n");
+  }
+  function extractJSON(t) {
+    try { return JSON.parse(t); } catch {}
+    const m = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (m) { try { return JSON.parse(m[1]); } catch {} }
+    const i = t.indexOf("{"), j = t.lastIndexOf("}");
+    if (i >= 0 && j > i) { try { return JSON.parse(t.slice(i, j + 1)); } catch {} }
+    return null;
+  }
+  function apSave() { if (apState) store.set("agency.autopilot", apState); }
+  function apReport() {
+    if (!apState) return "";
+    let r = `# Autopilot launch kit\n\n**Goal:** ${apState.goal}\n\n**Strategy:** ${apState.summary || ""}`;
+    if (apState.kit) r += `\n\n---\n\n${apState.kit}`;
+    apState.steps.forEach((st, i) => { if (st.text) r += `\n\n---\n\n## ${i + 1}. ${st.title} (${st.name})\n\n${st.text}`; });
+    return r;
+  }
+
+  function stepEl(st, i) {
+    const d = document.createElement("details");
+    d.className = "ap-step" + (st.kind === "kit" ? " kit" : "");
+    const a = bySlug.get(st.slug), dv = a && divMap.get(a.division);
+    d.style.setProperty("--c", dv ? dv.color : "var(--ink)");
+    d.open = st.status === "working" || st.kind === "kit" || (st.kind === "plan" && st.status === "done" && !apState.steps.some(x => x.status === "done"));
+    d.innerHTML = `<summary><span class="ap-num"></span><span class="ava" aria-hidden="true"></span><span class="ap-who"><b></b><small></small></span><span class="state"></span></summary><div class="md"></div>`;
+    d.querySelector(".ap-num").textContent = st.kind === "task" ? String(i + 1).padStart(2, "0") : st.kind === "plan" ? "PLAN" : "KIT";
+    d.querySelector(".ava").textContent = st.emoji || "•";
+    d.querySelector("b").textContent = st.kind === "kit" ? "Launch kit" : st.title;
+    d.querySelector("small").textContent = st.name;
+    const s = d.querySelector(".state"); s.textContent = st.status; s.className = "state " + st.status;
+    const md = d.querySelector(".md");
+    md.innerHTML = st.text ? renderMd(st.text) : st.status === "working" ? `<p class="thinking">${st.kind === "plan" ? "Planning the work and choosing specialists…" : "Working on it…"}</p>` : st.status === "failed" ? "" : `<p class="note">Waiting for the teammates before.</p>`;
+    if (st.error) md.insertAdjacentHTML("beforeend", `<p class="note">${esc(st.error)}</p>`);
+    return d;
+  }
+  function renderBoard() {
+    const b = $("ap-board"); b.innerHTML = "";
+    if (!apState) {
+      b.innerHTML = `<div class="ap-empty">
+        <div class="flow"><span><b>01</b>Plan</span><i></i><span><b>02</b>Specialists deliver</span><i></i><span><b>03</b>Launch kit</span></div>
+        <p>Write a goal on the left, or pick an example. The Orchestrator turns it into a plan, picks specialists from all ${data.agents.length} agents, and runs them one after another. Each step appears here as it finishes, and the last run stays saved in this browser.</p></div>`;
+      $("ap-copy").hidden = true; return;
+    }
+    const d = director();
+    b.append(stepEl({ kind: "plan", title: "The plan", name: d.name, emoji: d.emoji, slug: d.slug, status: apState.planStatus, text: apState.summary ? `**Strategy:** ${apState.summary}\n\n` + apState.steps.map((x, i) => `${i + 1}. **${x.title}**, ${x.name}`).join("\n") : "", error: apState.planError }, 0));
+    apState.steps.forEach((st, i) => b.append(stepEl({ ...st, kind: "task" }, i)));
+    if (apState.kitStatus) b.append(stepEl({ kind: "kit", name: d.name + " · your next steps", emoji: "🚀", slug: d.slug, status: apState.kitStatus, text: apState.kit, error: apState.kitError }, 0));
+    $("ap-copy").hidden = !apState.steps.some(x => x.text);
+  }
+  function live(update) { // re-render only the step that is working, throttled
+    if (live.raf) return; live.raf = requestAnimationFrame(() => { live.raf = 0; update(); });
+  }
+
+  async function runAutopilot(goal) {
+    goal = goal.trim();
+    if (!goal) { $("ap-goal").focus(); return toast("Write a goal first"); }
+    if (!(engine.kind === "claude" || engine.kind === "key")) return toast(engine.kind === "none" ? "Connect Claude first: open any agent to add your API key" : "Claude isn't available here");
+    const size = +$("ap-size").value || 6, d = director();
+    const ctl = new AbortController(); apRun = ctl;
+    $("ap-run").textContent = "Stop autopilot"; $("ap-goal").disabled = true;
+    apState = { goal, summary: "", steps: [], planStatus: "working", kitStatus: "", kit: "", at: Date.now() };
+    renderBoard();
+    const fail = (e) => { handleFatal(e); return e && e.code === "cancelled" ? "Stopped." : errCopy(e); };
+    try {
+      // 1. Plan
+      let plan = null;
+      try {
+        const prompt = `${GUARD}\n\nAUTOPILOT GOAL: ${goal}\n\nPlan how this agency reaches the goal. Choose ${size} tasks (no more) for specialists from the roster below, using their slugs exactly. Order the tasks so each builds on the ones before. Every task must produce one concrete, ready-to-use asset, such as: target customer and offer with pricing, landing page copy, a product outline, an email sequence, a content calendar, ad variations, a sales script, a financial projection. Prefer the most specific specialist for each task.\n\nReply with only JSON, no other text:\n{"summary": "one short paragraph of strategy", "tasks": [{"agent": "slug", "title": "short asset name", "brief": "exactly what to produce, 1-3 sentences"}]}\n\nROSTER (slug | name | speciality):\n${rosterIndex()}`;
+        const r = await runAgent(rules(d), [{ role: "user", content: prompt }], { signal: ctl.signal, tier: "default" });
+        plan = extractJSON(r.text);
+      } catch (e) { apState.planStatus = "failed"; apState.planError = fail(e); return; }
+      const tasks = (plan && Array.isArray(plan.tasks) ? plan.tasks : []).filter(t => t && bySlug.has(String(t.agent))).slice(0, size);
+      if (!tasks.length) { apState.planStatus = "failed"; apState.planError = "The plan came back unreadable. Start the autopilot again, or make the goal more specific."; return; }
+      apState.summary = String(plan.summary || "");
+      apState.steps = tasks.map(t => { const a = bySlug.get(String(t.agent)); return { slug: a.slug, name: a.name, emoji: a.emoji, title: String(t.title || "Task").slice(0, 80), brief: String(t.brief || ""), status: "queued", text: "" }; });
+      apState.planStatus = "done"; apSave(); renderBoard();
+      const planText = apState.steps.map((x, i) => `${i + 1}. ${x.title} (${x.name}): ${x.brief}`).join("\n");
+
+      // 2. Specialists
+      for (let i = 0; i < apState.steps.length; i++) {
+        const st = apState.steps[i], a = bySlug.get(st.slug);
+        st.status = "working"; renderBoard();
+        let budget = 40000;
+        const prior = apState.steps.slice(0, i).filter(x => x.text).reverse().map(x => { const t = x.text.slice(0, Math.min(8000, Math.max(0, budget))); budget -= t.length; return t ? `## ${x.title} (${x.name})\n\n${t}` : ""; }).filter(Boolean).reverse().join("\n\n");
+        const prompt = `${GUARD}\n\nAUTOPILOT GOAL: ${goal}\n\nSTRATEGY: ${apState.summary}\n\nFULL PLAN:\n${planText}\n\nYOUR TASK (#${i + 1}): ${st.title}\n${st.brief}\n\n` +
+          (prior ? `Work your teammates already delivered (build on it, keep names, prices and positioning consistent, don't repeat it):\n<teammate_work>\n${prior}\n</teammate_work>\n\n` : "You go first; set foundations the others can build on.\n\n") +
+          "Deliver your asset now, complete and ready to use. Open with a one-line heading naming it.";
+        try {
+          const r = await runAgent(rules(a), [{ role: "user", content: prompt }], { signal: ctl.signal, tier: "default",
+            onText: ({ text }) => { st.text = text; live(renderBoard); } });
+          st.text = r.text; st.status = "done";
+        } catch (e) {
+          st.status = "failed"; if (e && e.text) st.text = e.text; st.error = fail(e);
+          apState.steps.slice(i + 1).forEach(x => x.status = "skipped");
+          return;
+        }
+        apSave(); renderBoard();
+      }
+
+      // 3. Launch kit
+      apState.kitStatus = "working"; renderBoard();
+      const all = apState.steps.map((x, i) => `## ${i + 1}. ${x.title} (${x.name})\n\n${x.text.slice(0, 6000)}`).join("\n\n");
+      const prompt = `${GUARD}\n\nAUTOPILOT GOAL: ${goal}\n\nYour team has delivered everything below. Write the LAUNCH KIT for the human who will take this to market. Use these sections:\n\n## What the team built\nOne line per asset.\n\n## Launch checklist\nNumbered, concrete actions in order, starting today, each naming the asset to use. Include the exact accounts or tools to set up (for example Stripe, Gumroad, Lemon Squeezy, a website builder, an email tool) and roughly how long each step takes.\n\n## How the money comes in\nPrice, how payment is collected, and a clearly labelled estimate of the first 30 to 90 days with every assumption stated. Be conservative and honest.\n\n## Measure and adjust\nThe three numbers to watch and what to change if they are low.\n\n## Risks\nThe main risks and how to reduce them.\n\n<team_work>\n${all}\n</team_work>`;
+      try {
+        const r = await runAgent(rules(d), [{ role: "user", content: prompt }], { signal: ctl.signal, tier: "default",
+          onText: ({ text }) => { apState.kit = text; live(renderBoard); } });
+        apState.kit = r.text; apState.kitStatus = "done";
+      } catch (e) { apState.kitStatus = "failed"; if (e && e.text) apState.kit = e.text; apState.kitError = fail(e); }
+    } finally {
+      apRun = null; apSave(); renderBoard();
+      $("ap-run").textContent = "Start autopilot"; $("ap-goal").disabled = false; engineUI();
+      if (apState && apState.kitStatus === "done") toast("Launch kit ready");
+    }
+  }
+  function initAutopilot() {
+    $("ap-ideas").innerHTML = IDEAS.map((t, i) => `<button type="button" data-idea="${i}">${esc(t)}</button>`).join("");
+    if (apState) {
+      $("ap-goal").value = apState.goal || "";
+      // a run interrupted by closing the page can't resume
+      if (apState.planStatus === "working") { apState.planStatus = "failed"; apState.planError = "This run was interrupted."; }
+      apState.steps.forEach(x => { if (x.status === "working") { x.status = "failed"; x.error = "This run was interrupted."; } });
+      if (apState.kitStatus === "working") { apState.kitStatus = "failed"; apState.kitError = "This run was interrupted."; }
+    }
+    renderBoard();
+  }
+
   // Events
   document.addEventListener("click", e => {
     const p = e.target.closest("[data-pick]"); if (p) { e.preventDefault(); toggleTeam(p.dataset.pick); return; }
@@ -944,6 +1149,7 @@ ${a.body.slice(0, 80000)}
     const ca = e.target.closest("[data-copyans]"); if (ca) { copy(ca.closest(".msg")._text, "Answer copied"); return; }
     const go = e.target.closest("[data-go]"); if (go) { send("Introduce yourself in a few lines, then list the concrete deliverables you can produce for me, with one short example of your work."); return; }
     const fill = e.target.closest("[data-fill]"); if (fill) { const v = $("starters")._list[+fill.dataset.fill]; $("ask").value = v; $("ask").focus(); $("ask").setSelectionRange(v.length, v.length); return; }
+    const idea = e.target.closest("[data-idea]"); if (idea) { $("ap-goal").value = IDEAS[+idea.dataset.idea]; $("ap-goal").focus(); return; }
     const dp = e.target.closest("[data-dept]"); if (dp) { pickDept(dp.dataset.dept); return; }
     const c = e.target.closest(".chip"); if (c) { state.div = c.dataset.div; store.set("agency.div", state.div); renderChips(); render(); }
   });
@@ -964,6 +1170,8 @@ ${a.body.slice(0, 80000)}
   $("key-forget").addEventListener("click", () => { setKey(""); engine.kind = "none"; engineUI(); toast("Key removed"); });
   $("job-form").addEventListener("submit", e => { e.preventDefault(); jobRun ? jobRun.abort() : runTeam($("job").value); });
   $("job-copy").addEventListener("click", () => copy(jobReport, "Report copied"));
+  $("ap-form").addEventListener("submit", e => { e.preventDefault(); apRun ? apRun.abort() : runAutopilot($("ap-goal").value); });
+  $("ap-copy").addEventListener("click", () => copy(apReport(), "Launch kit copied"));
   $("tray-open").addEventListener("click", () => { location.hash = "team"; });
   $("tray-clear").addEventListener("click", clearTeam);
   $("team-clear").addEventListener("click", clearTeam);

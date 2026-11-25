@@ -7,6 +7,12 @@ A static website for browsing every agent in
 - **Give any agent a job.** Each agent runs on Claude with its full brief as its
   instructions and hands back the real deliverable (code, copy, plans, reviews),
   in a chat you can keep refining. Pick Fast, Standard or Deep.
+- **Autopilot.** Write one business goal. The Agents Orchestrator plans the
+  work, picks specialists from the whole roster and runs them one after another,
+  each building on the last, then writes a launch kit: what was built, a launch
+  checklist, how the money comes in (as labelled estimates), what to measure and
+  the risks. The agents produce the work; a person launches it. They cannot take
+  payments, post, send email or spend money, so nothing goes out on its own.
 - **Run a team.** Pick several agents and give them one job; each works in turn
   and builds on what the teammates before it delivered. Copy the full report.
 - Search by role, skill or vibe, and filter by the repo's 18 divisions
