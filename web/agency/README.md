@@ -59,3 +59,16 @@ cd web/agency && python3 -m http.server 8000
 
 Any static host works (GitHub Pages, Netlify, Cloudflare Pages): upload the
 `web/agency` folder as-is.
+
+## desksix.com (AppDeploy)
+
+desksix.com serves this site from the AppDeploy app `desk-six-cisxpy`. Its
+`index.html` is a small shell: the markup from `cdn/body.html`, plus
+`cdn/app.css`, `cdn/app.js` and `agents.json` loaded from a pinned commit of
+this repo through jsDelivr. To ship changes: run `build.py`, commit and push,
+then redeploy `index.html` with the new commit hash in its three jsDelivr URLs.
+Visitors there run agents with their own Anthropic API key.
+
+The app previously ran the Desk Six Kraken bot. Its last bot version is
+`1794604981493` in the app's version history (restore with AppDeploy's
+apply_app_version). The bot's Kraken API key secrets are still stored on the app.
