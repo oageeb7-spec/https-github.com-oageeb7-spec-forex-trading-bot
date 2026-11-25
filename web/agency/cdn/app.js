@@ -191,7 +191,7 @@
     const fail = () => {
       if (fallbackEl) { fallbackEl.focus(); fallbackEl.select(); toast("Selected. Press Ctrl+C or ⌘C to copy."); }
       else { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
-        let r = false; try { r = document.execCommand("copy"); } catch {} ta.remove(); r ? ok() : toast("Copy was blocked here. Use View on GitHub instead."); }
+        let r = false; try { r = document.execCommand("copy"); } catch {} ta.remove(); r ? ok() : toast("Copy was blocked here. Select the text instead."); }
     };
     try { navigator.clipboard.writeText(text).then(ok, fail); } catch { fail(); }
   }
