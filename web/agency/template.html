@@ -1,4 +1,4 @@
-<title>The Agency Roster</title>
+<title>Desk Six</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="283 open-source AI specialists in one agency. Give any agent a job, run a team, or install them in Claude Code.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -325,7 +325,7 @@ textarea#ask:focus,textarea#job:focus,.key-row input:focus{outline:none;border-c
 
 <div class="wrap">
   <nav class="nav" aria-label="Main">
-    <a class="mark" href="#" aria-label="The Agency Roster, top"><span class="mark-dots" id="mark-dots" aria-hidden="true"></span>The Agency</a>
+    <a class="mark" href="#" aria-label="Desk Six, top"><span class="mark-dots" id="mark-dots" aria-hidden="true"></span>Desk Six</a>
     <div class="nav-links">
       <a href="#autopilot">Autopilot</a>
       <a href="#departments">Departments</a>
@@ -703,7 +703,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     syncDrawerPick();
     showTab("work"); renderLog(a);
     show("drawer");
-    document.title = a.name + " · The Agency Roster";
+    document.title = a.name + " · Desk Six";
   }
   function show(id) {
     ["drawer", "team"].forEach(x => { const on = x === id; $(x).classList.toggle("on", on); $(x).setAttribute("aria-hidden", !on); });
@@ -712,7 +712,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
     if (id) setTimeout(() => (id === "drawer" && !$("composer").hidden ? $("ask") : $(id).querySelector(".close")).focus(), 50);
   }
   function closeAll() {
-    show(null); current = null; document.title = "The Agency Roster";
+    show(null); current = null; document.title = "Desk Six";
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
   }
   function route() {
@@ -768,7 +768,7 @@ curl -fsSL -o ~/.claude/agents/&lt;agent&gt;.md \
   function handleFatal(e) { if (FATAL.includes(e && e.code)) { engine.kind = "off"; engineUI(); } }
 
   function rules(a) {
-    return `You are now working as "${a.name}", a specialist in The Agency (${divMap.get(a.division).label} division). Below is your full agent definition. Adopt its identity, expertise, communication style, rules and workflow completely.
+    return `You are now working as "${a.name}", a specialist at Desk Six (${divMap.get(a.division).label} division). Below is your full agent definition. Adopt its identity, expertise, communication style, rules and workflow completely.
 
 How to work:
 - Do the actual job. Put the real, complete deliverable (code, copy, plan, analysis, review, document) in your reply, not a description of what you would do.

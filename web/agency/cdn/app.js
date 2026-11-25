@@ -162,7 +162,7 @@
     syncDrawerPick();
     showTab("work"); renderLog(a);
     show("drawer");
-    document.title = a.name + " · The Agency Roster";
+    document.title = a.name + " · Desk Six";
   }
   function show(id) {
     ["drawer", "team"].forEach(x => { const on = x === id; $(x).classList.toggle("on", on); $(x).setAttribute("aria-hidden", !on); });
@@ -171,7 +171,7 @@
     if (id) setTimeout(() => (id === "drawer" && !$("composer").hidden ? $("ask") : $(id).querySelector(".close")).focus(), 50);
   }
   function closeAll() {
-    show(null); current = null; document.title = "The Agency Roster";
+    show(null); current = null; document.title = "Desk Six";
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
   }
   function route() {
@@ -227,7 +227,7 @@
   function handleFatal(e) { if (FATAL.includes(e && e.code)) { engine.kind = "off"; engineUI(); } }
 
   function rules(a) {
-    return `You are now working as "${a.name}", a specialist in The Agency (${divMap.get(a.division).label} division). Below is your full agent definition. Adopt its identity, expertise, communication style, rules and workflow completely.
+    return `You are now working as "${a.name}", a specialist at Desk Six (${divMap.get(a.division).label} division). Below is your full agent definition. Adopt its identity, expertise, communication style, rules and workflow completely.
 
 How to work:
 - Do the actual job. Put the real, complete deliverable (code, copy, plan, analysis, review, document) in your reply, not a description of what you would do.
